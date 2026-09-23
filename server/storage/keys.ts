@@ -27,8 +27,8 @@ export function assertValidBlobKey(key: string): void {
 
   const segments = key.split('/')
   for (const segment of segments) {
-    if (segment === '.' || segment === '..') {
-      throw new InvalidBlobKeyError(key, 'must not contain a "." or ".." segment')
+    if (segment.startsWith('.')) {
+      throw new InvalidBlobKeyError(key, 'segments must not start with "."')
     }
     if (!SEGMENT_PATTERN.test(segment)) {
       throw new InvalidBlobKeyError(
@@ -36,6 +36,11 @@ export function assertValidBlobKey(key: string): void {
         'segments may only contain letters, digits, "." "_" and "-"'
       )
     }
+  }
+
+  const lastSegment = segments[segments.length - 1]
+  if (lastSegment?.endsWith('.meta.json')) {
+    throw new InvalidBlobKeyError(key, '".meta.json" is reserved for content-type sidecars')
   }
 }
 

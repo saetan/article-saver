@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { InvalidBlobKeyError } from './errors'
 import type { BlobStorage } from './types'
 
 /**
@@ -47,6 +48,14 @@ export function runBlobStorageContractTests(
       expect(result?.contentType).toBeNull()
     })
 
+    it('clears a previously stored content type when overwritten without one', async () => {
+      const storage = await createAdapter()
+      await storage.put('users/u1/a.pdf', Buffer.from('%PDF-1.4'), 'application/pdf')
+      await storage.put('users/u1/a.pdf', Buffer.from('plain now'))
+      const result = await storage.get('users/u1/a.pdf')
+      expect(result?.contentType).toBeNull()
+    })
+
     it('preserves arbitrary binary content losslessly', async () => {
       const storage = await createAdapter()
       const bytes = Buffer.from([0, 1, 2, 9, 10, 13, 127, 200, 255])
@@ -75,6 +84,13 @@ export function runBlobStorageContractTests(
       await storage.delete('users/u1/a.txt')
       await expect(storage.exists('users/u1/a.txt')).resolves.toBe(false)
       await expect(storage.get('users/u1/a.txt')).resolves.toBeNull()
+    })
+
+    it('rejects a key that collides with the content-type sidecar name', async () => {
+      const storage = await createAdapter()
+      await expect(storage.put('users/u1/x.meta.json', Buffer.from('x'))).rejects.toThrow(
+        InvalidBlobKeyError
+      )
     })
 
     it('keeps unrelated keys independent', async () => {

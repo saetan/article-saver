@@ -38,6 +38,18 @@ describe('assertValidBlobKey', () => {
   it('rejects a key with an empty segment', () => {
     expect(() => assertValidBlobKey('users//a.pdf')).toThrow(InvalidBlobKeyError)
   })
+
+  it('rejects a key whose last segment ends in .meta.json (reserved for sidecars)', () => {
+    expect(() => assertValidBlobKey('users/u1/x.meta.json')).toThrow(InvalidBlobKeyError)
+  })
+
+  it('rejects a segment starting with a dot', () => {
+    expect(() => assertValidBlobKey('users/u1/.hidden')).toThrow(InvalidBlobKeyError)
+  })
+
+  it('rejects a leading dot segment even mid-key', () => {
+    expect(() => assertValidBlobKey('.config/users/u1/a.pdf')).toThrow(InvalidBlobKeyError)
+  })
 })
 
 describe('userBlobKey', () => {

@@ -55,6 +55,18 @@ describe('createReplitBlobStorage', () => {
     expect(uploadSpy).not.toHaveBeenCalled()
   })
 
+  it('wraps a non-404 sidecar-clear failure in BlobStorageError', async () => {
+    const client = createFakeClient()
+    vi.spyOn(client, 'delete').mockResolvedValue({
+      ok: false,
+      error: { message: 'boom', statusCode: 500 }
+    })
+    const storage = createReplitBlobStorage({ client })
+    await expect(storage.put('users/u1/a.txt', Buffer.from('x'), null)).rejects.toThrow(
+      BlobStorageError
+    )
+  })
+
   it('wraps a non-404 upload failure in BlobStorageError', async () => {
     const client = createFakeClient()
     vi.spyOn(client, 'uploadFromBytes').mockResolvedValue({
@@ -85,12 +97,14 @@ describe('createReplitBlobStorage', () => {
     await expect(storage.exists('users/u1/a.txt')).rejects.toThrow(BlobStorageError)
   })
 
-  it('does not fail put() when content type sidecar write is skipped for null contentType', async () => {
+  it('clears (rather than writes) the sidecar on put() with no contentType', async () => {
     const client = createFakeClient()
     const uploadTextSpy = vi.spyOn(client, 'uploadFromText')
+    const deleteSpy = vi.spyOn(client, 'delete')
     const storage = createReplitBlobStorage({ client })
     await storage.put('users/u1/a.txt', Buffer.from('hi'), null)
     expect(uploadTextSpy).not.toHaveBeenCalled()
+    expect(deleteSpy).toHaveBeenCalledWith('users/u1/a.txt.meta.json', { ignoreNotFound: true })
   })
 
   it('deletes both the object and its content-type sidecar', async () => {

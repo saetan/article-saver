@@ -74,6 +74,12 @@ export function createReplitBlobStorage(options: ReplitBlobStorageOptions): Blob
           'upload metadata for',
           key
         )
+      } else {
+        unwrap(
+          await client.delete(metaKeyFor(key), { ignoreNotFound: true }),
+          'clear metadata for',
+          key
+        )
       }
     },
 
