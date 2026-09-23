@@ -1,0 +1,41 @@
+# Dependencies
+node_modules/
+
+# Nuxt / Nitro build output
+.nuxt/
+.output/
+.nitro/
+.cache/
+dist/
+
+# Local data (SQLite files, local blob storage)
+.data/
+*.sqlite
+*.sqlite-journal
+*.db
+*.db-journal
+
+# Environment & secrets — never commit real values
+.env
+.env.*
+!.env.example
+
+# Tests
+coverage/
+test-results/
+playwright-report/
+blob-report/
+playwright/.cache/
+playwright/.auth/
+
+# Logs
+*.log
+npm-debug.log*
+pnpm-debug.log*
+
+# OS / editor
+.DS_Store
+.idea/
+.vscode/*
+!.vscode/extensions.json
+*.swp
