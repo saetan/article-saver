@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import { access, mkdir, readFile, rename, rm, writeFile } from 'node:fs/promises'
 import { dirname, resolve, sep } from 'node:path'
+import { decodeContentType, encodeContentType } from './blob-meta'
 import { InvalidBlobKeyError } from './errors'
 import { assertValidBlobKey } from './keys'
 import type { BlobStorage } from './types'
@@ -40,19 +41,21 @@ export function createLocalBlobStorage(options: LocalBlobStorageOptions): BlobSt
     return target
   }
 
+  async function writeAtomically(filePath: string, contents: string | Buffer): Promise<void> {
+    const tmpPath = resolve(dirname(filePath), `.${randomUUID()}.tmp`)
+    await writeFile(tmpPath, contents)
+    await rename(tmpPath, filePath)
+  }
+
   return {
     async put(key, content, contentType = null) {
       const filePath = resolveWithinBase(key)
-      const dir = dirname(filePath)
-      await mkdir(dir, { recursive: true })
-
-      const tmpPath = resolve(dir, `.${randomUUID()}.tmp`)
-      await writeFile(tmpPath, content)
-      await rename(tmpPath, filePath)
+      await mkdir(dirname(filePath), { recursive: true })
+      await writeAtomically(filePath, content)
 
       const metaPath = metaPathFor(filePath)
       if (contentType) {
-        await writeFile(metaPath, JSON.stringify({ contentType }), 'utf8')
+        await writeAtomically(metaPath, encodeContentType(contentType))
       } else {
         await rm(metaPath, { force: true })
       }
@@ -70,8 +73,7 @@ export function createLocalBlobStorage(options: LocalBlobStorageOptions): BlobSt
 
       let contentType: string | null = null
       try {
-        const raw = await readFile(metaPathFor(filePath), 'utf8')
-        contentType = (JSON.parse(raw) as { contentType?: string }).contentType ?? null
+        contentType = decodeContentType(await readFile(metaPathFor(filePath), 'utf8'))
       } catch (error) {
         if (!isNotFound(error)) throw error
       }

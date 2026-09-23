@@ -102,4 +102,15 @@ describe('createReplitBlobStorage', () => {
     expect(deleteSpy).toHaveBeenCalledWith('users/u1/a.txt', { ignoreNotFound: true })
     expect(deleteSpy).toHaveBeenCalledWith('users/u1/a.txt.meta.json', { ignoreNotFound: true })
   })
+
+  it('returns contentType: null instead of throwing when the meta sidecar is corrupt', async () => {
+    const client = createFakeClient()
+    const storage = createReplitBlobStorage({ client })
+    await storage.put('users/u1/a.txt', Buffer.from('hi'), 'text/plain')
+    await client.uploadFromText('users/u1/a.txt.meta.json', 'not valid json{{{')
+
+    const result = await storage.get('users/u1/a.txt')
+    expect(result?.content.toString('utf8')).toBe('hi')
+    expect(result?.contentType).toBeNull()
+  })
 })

@@ -1,4 +1,4 @@
-import { mkdtemp, readdir, rm } from 'node:fs/promises'
+import { mkdtemp, readdir, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
@@ -60,5 +60,17 @@ describe('createLocalBlobStorage path safety', () => {
     await storage.put('a.txt', Buffer.from('hello'))
     const entries = await readdir(dir)
     expect(entries.filter((name) => name.endsWith('.tmp'))).toEqual([])
+  })
+
+  it('returns contentType: null instead of throwing when the meta sidecar is corrupt', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'blob-storage-'))
+    tempDirs.push(dir)
+    const storage = createLocalBlobStorage({ baseDir: dir })
+    await storage.put('a.txt', Buffer.from('hello'), 'text/plain')
+    await writeFile(join(dir, 'a.txt.meta.json'), 'not valid json{{{', 'utf8')
+
+    const result = await storage.get('a.txt')
+    expect(result?.content.toString('utf8')).toBe('hello')
+    expect(result?.contentType).toBeNull()
   })
 })

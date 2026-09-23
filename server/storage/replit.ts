@@ -1,3 +1,4 @@
+import { decodeContentType, encodeContentType } from './blob-meta'
 import { BlobStorageError } from './errors'
 import { assertValidBlobKey } from './keys'
 import type { BlobStorage } from './types'
@@ -69,7 +70,7 @@ export function createReplitBlobStorage(options: ReplitBlobStorageOptions): Blob
 
       if (contentType) {
         unwrap(
-          await client.uploadFromText(metaKeyFor(key), JSON.stringify({ contentType })),
+          await client.uploadFromText(metaKeyFor(key), encodeContentType(contentType)),
           'upload metadata for',
           key
         )
@@ -91,9 +92,7 @@ export function createReplitBlobStorage(options: ReplitBlobStorageOptions): Blob
       let contentType: string | null = null
       const metaResult = await client.downloadAsText(metaKeyFor(key))
       if (metaResult.ok) {
-        contentType =
-          (JSON.parse(unwrap(metaResult, 'download metadata for', key)) as { contentType?: string })
-            .contentType ?? null
+        contentType = decodeContentType(unwrap(metaResult, 'download metadata for', key))
       } else if (!isNotFound(metaResult.error)) {
         throw new BlobStorageError(
           `Failed to download metadata for blob "${key}": ${metaResult.error?.message}`,
