@@ -1,0 +1,13 @@
+.nuxt
+.output
+.data
+dist
+node_modules
+pnpm-lock.yaml
+coverage
+
+# Pre-existing project docs, not owned by the app's formatting rules
+*.md
+docs/
+.github/ISSUE_TEMPLATE/
+LICENSE

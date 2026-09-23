@@ -1,0 +1,14 @@
+overrides:
+  # Node 20.19 (this project's target) lacks Object.groupBy; pin below the
+  # version of eslint-flat-config-utils that started relying on it.
+  # Safe to lift once the toolchain moves to Node >=21 (or a Node 20.x with
+  # Object.groupBy backported).
+  eslint-flat-config-utils: '3.0.2'
+allowBuilds:
+  '@parcel/watcher': false
+  '@tailwindcss/oxide': false
+  esbuild: false
+  unrs-resolver: false
+  vue-demi: false
+minimumReleaseAgeExclude:
+  - prettier@3.9.9
