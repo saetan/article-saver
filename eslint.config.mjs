@@ -5,6 +5,9 @@ import { getDefaultAttributes } from 'eslint-plugin-better-tailwindcss/api/defau
 import eslintConfigPrettier from 'eslint-config-prettier'
 
 export default withNuxt(
+  {
+    ignores: ['**/.claude/**']
+  },
   betterTailwindcss.configs['correctness-error'],
   {
     settings: {

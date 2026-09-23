@@ -8,7 +8,13 @@ export default defineConfig({
           name: 'unit',
           environment: 'node',
           include: ['**/*.unit.test.ts'],
-          exclude: ['**/node_modules/**', '**/.nuxt/**', '**/.output/**', '**/dist/**']
+          exclude: [
+            '**/node_modules/**',
+            '**/.nuxt/**',
+            '**/.output/**',
+            '**/dist/**',
+            '**/.claude/**'
+          ]
         }
       }
     ]

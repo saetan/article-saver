@@ -27,10 +27,10 @@ The reasoning behind each choice lives in [`docs/decisions/`](docs/decisions/). 
 
 ## Development
 
-Requires Node 20.19+ and pnpm.
+Requires Node 24+ (see `.nvmrc`) and pnpm.
 
 ```sh
-cp .env.example .env   # fill in values; never commit .env
+cp .env.example .env  # fill in values; never commit .env
 pnpm install
 pnpm dev               # http://localhost:3000
 ```
@@ -40,12 +40,12 @@ Other scripts:
 ```sh
 pnpm build         # production build
 pnpm preview        # preview the production build
-pnpm lint             # eslint
-pnpm format            # prettier --write
-pnpm format:check       # prettier --check
-pnpm typecheck            # nuxt typecheck (strict TypeScript)
-pnpm test                    # unit test suite
-pnpm test:unit                # vitest "unit" project only
+pnpm lint           # eslint
+pnpm format         # prettier --write
+pnpm format:check   # prettier --check
+pnpm typecheck      # nuxt typecheck (strict TypeScript)
+pnpm test           # unit test suite
+pnpm test:unit      # vitest "unit" project only
 ```
 
 The app is a Nuxt 4 SPA (`ssr: false`, `app/` directory layout) with a Nitro API under `server/`. `GET /api/health` returns `{ ok: true }`.

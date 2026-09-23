@@ -6,6 +6,9 @@ node_modules
 pnpm-lock.yaml
 coverage
 
+# Claude Code agent worktrees — other branches' checkouts, not project files
+**/.claude/**
+
 # Pre-existing project docs, not owned by the app's formatting rules
 *.md
 docs/
