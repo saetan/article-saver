@@ -26,9 +26,11 @@
     "@nuxt/ui": "^4.11.1",
     "@replit/object-storage": "^1.0.0",
     "drizzle-orm": "^0.45.3",
+    "ipaddr.js": "^2.5.0",
     "nuxt": "^4.5.2",
     "postgres": "^3.4.9",
     "tailwindcss": "^4.3.3",
+    "undici": "^8.11.0",
     "uuid": "^14.0.2"
   },
   "devDependencies": {
