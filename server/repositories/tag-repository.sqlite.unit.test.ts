@@ -4,5 +4,5 @@ import { runTagRepositoryContractTests } from './tag-repository.contract'
 
 runTagRepositoryContractTests(async () => {
   const ctx = await createTestSqliteDbContext()
-  return { repo: createTagRepository(ctx) }
+  return { repo: await createTagRepository(ctx) }
 })

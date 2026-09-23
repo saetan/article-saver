@@ -5,9 +5,11 @@ import { runJobRepositoryContractTests } from './job-repository.contract'
 
 runJobRepositoryContractTests(async () => {
   const ctx = await createTestSqliteDbContext()
-  const item = await createItemRepository(ctx).create('user-1', {
+  const item = await (
+    await createItemRepository(ctx)
+  ).create('user-1', {
     type: 'article',
     url: 'https://example.com/post'
   })
-  return { repo: createJobRepository(ctx), itemId: item.id }
+  return { repo: await createJobRepository(ctx), itemId: item.id }
 })

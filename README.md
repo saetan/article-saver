@@ -46,11 +46,20 @@ pnpm format:check   # prettier --check
 pnpm typecheck      # nuxt typecheck (strict TypeScript)
 pnpm test           # unit test suite
 pnpm test:unit      # vitest "unit" project only
+pnpm db:generate    # generate a migration for DB_DIALECT (sqlite | postgres)
+pnpm db:migrate     # apply pending migrations for DB_DIALECT
 ```
 
 The app is a Nuxt 4 SPA (`ssr: false`, `app/` directory layout) with a Nitro API under `server/`. `GET /api/health` returns `{ ok: true }`.
 
-Postgres for local development and integration tests runs in a container (Docker or Podman — see [ADR 0012](docs/decisions/0012-testing-and-ci-strategy.md)). It is not required for this M0 scaffold, which has no database yet.
+Postgres for local development and integration tests runs in a container (Docker or Podman — see [ADR 0012](docs/decisions/0012-testing-and-ci-strategy.md)).
+
+### Database (ADR 0006)
+
+Drizzle schemas, migrations and repositories live under `server/db/` and `server/repositories/`; app code only ever talks to the repository layer (`ItemRepository`, `TagRepository`, `JobRepository`), never to Drizzle directly. `DB_DIALECT` (`sqlite` | `postgres`) selects the driver `useDb()` builds — `@libsql/client` locally, `postgres.js` in production.
+
+- `pnpm db:generate` writes a new migration to `server/db/migrations/<dialect>/` from the schema in `server/db/schema/<dialect>.ts`. Schema changes are made in **both** dialect files and a migration generated for each.
+- **Migrations are a deploy step, not automatic on server start.** Run `pnpm db:migrate` (with `DB_DIALECT=postgres` and `DATABASE_URL` set) before starting the server on every deploy. For local SQLite dev, run it once after `pnpm install` (or whenever the schema changes) — `SQLITE_PATH` defaults to `./.data/article-saver.sqlite`.
 
 ## Contributing workflow
 

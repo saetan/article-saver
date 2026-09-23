@@ -4,5 +4,5 @@ import { runItemRepositoryContractTests } from './item-repository.contract'
 
 runItemRepositoryContractTests(async () => {
   const ctx = await createTestSqliteDbContext()
-  return { repo: createItemRepository(ctx) }
+  return { repo: await createItemRepository(ctx) }
 })
