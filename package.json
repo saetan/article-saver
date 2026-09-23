@@ -18,7 +18,7 @@
     "test": "pnpm test:unit",
     "db:generate": "node scripts/db.mjs generate",
     "db:migrate": "node scripts/db.mjs migrate",
-    "prepare": "husky"
+    "prepare": "husky || true"
   },
   "dependencies": {
     "@iconify-json/lucide": "^1.2.134",

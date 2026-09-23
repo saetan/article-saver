@@ -81,7 +81,7 @@ Install gitleaks once per machine:
 brew install gitleaks
 ```
 
-The hooks are installed automatically by `pnpm install` (via the `prepare` script). gitleaks also runs in CI so a bypassed local hook (`--no-verify`) is still caught.
+The hooks are installed automatically by `pnpm install` (via the `prepare` script). gitleaks is planned to also run in CI (see ADR 0012, tracked in #8) — until that CI job exists, `git commit --no-verify` bypasses the check entirely, so don't use it.
 
 ## License
 
