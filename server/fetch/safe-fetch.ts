@@ -9,6 +9,13 @@ const DEFAULT_USER_AGENT = 'ArticleSaverBot/1.0 (+https://github.com/saetan/arti
 
 const REDIRECT_STATUSES = new Set([301, 302, 303, 307, 308])
 
+/**
+ * Headers that must not survive a cross-origin redirect, matching `fetch()`
+ * semantics: a caller passing `authorization`/`cookie` for site A must not
+ * have them replayed against whatever host A's redirect points at.
+ */
+const CROSS_ORIGIN_UNSAFE_HEADERS = new Set(['authorization', 'cookie', 'proxy-authorization'])
+
 export interface SafeFetchOptions extends HostPolicyOptions {
   method?: string
   headers?: Record<string, string>
@@ -90,6 +97,33 @@ function headerValue(
   return Array.isArray(value) ? value[0] : value
 }
 
+/** Case-insensitively merges `overrides` on top of `defaults`, keeping the override's casing. */
+function mergeHeaders(
+  defaults: Record<string, string>,
+  overrides: Record<string, string> | undefined
+): Record<string, string> {
+  const byLowerKey = new Map<string, [string, string]>()
+
+  for (const [key, value] of Object.entries(defaults)) {
+    byLowerKey.set(key.toLowerCase(), [key, value])
+  }
+  for (const [key, value] of Object.entries(overrides ?? {})) {
+    byLowerKey.set(key.toLowerCase(), [key, value])
+  }
+
+  return Object.fromEntries(byLowerKey.values())
+}
+
+/** Case-insensitively strips headers that must not survive a cross-origin redirect. */
+function stripCrossOriginUnsafeHeaders(headers: Record<string, string>): Record<string, string> {
+  const result: Record<string, string> = {}
+  for (const [key, value] of Object.entries(headers)) {
+    if (CROSS_ORIGIN_UNSAFE_HEADERS.has(key.toLowerCase())) continue
+    result[key] = value
+  }
+  return result
+}
+
 /**
  * Fetches `input` while guarding against SSRF: only `http:`/`https:`, no
  * embedded credentials, every hostname and IP literal (including every hop
@@ -101,6 +135,18 @@ function headerValue(
  * Enforces a total timeout (default 10s) across all redirect hops, a max
  * response size (default 10 MB) enforced while streaming rather than only
  * via `Content-Length`, and a max redirect count (default 5).
+ *
+ * `authorization`, `cookie` and `proxy-authorization` are dropped from
+ * `opts.headers` before following a redirect to a different origin
+ * (scheme+host+port), matching `fetch()`'s credential-leak protection.
+ *
+ * Responses are **not** decompressed: we send `accept-encoding: identity`
+ * by default (the caller can override it) so a compliant server won't
+ * gzip/br/deflate its response in the first place. If a server sends a
+ * compressed body anyway, `text()`/`body` will contain the raw compressed
+ * bytes, not decoded text - decompression is deliberately out of scope
+ * here since an attacker-controlled server could otherwise use it for a
+ * decompression/zip-bomb style memory blowup past `maxBytes`.
  */
 export async function safeFetch(
   input: string,
@@ -134,6 +180,7 @@ export async function safeFetch(
     let currentUrl = validateUrl(input)
     let method = opts.method ?? 'GET'
     let bodyPayload = opts.body
+    let requestHeaders = opts.headers ?? {}
     let hops = 0
 
     for (;;) {
@@ -144,7 +191,10 @@ export async function safeFetch(
       try {
         const response = await undiciRequest(currentUrl.href, {
           method,
-          headers: { 'user-agent': userAgent, ...opts.headers },
+          headers: mergeHeaders(
+            { 'user-agent': userAgent, 'accept-encoding': 'identity' },
+            requestHeaders
+          ),
           body: bodyPayload,
           dispatcher: agent,
           signal: totalController.signal
@@ -175,6 +225,10 @@ export async function safeFetch(
           ) {
             method = 'GET'
             bodyPayload = undefined
+          }
+
+          if (nextUrl.origin !== currentUrl.origin) {
+            requestHeaders = stripCrossOriginUnsafeHeaders(requestHeaders)
           }
 
           currentUrl = nextUrl

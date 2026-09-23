@@ -135,6 +135,64 @@ describe('safeFetch', () => {
     expect(result.url).toBe(targetUrl + '/')
   })
 
+  it('drops authorization/cookie/proxy-authorization on a cross-origin redirect', async () => {
+    let receivedByTarget: http.IncomingHttpHeaders = {}
+    const { server: target, url: targetUrl } = await startServer((req, res) => {
+      receivedByTarget = req.headers
+      res.end('ok')
+    })
+    servers.push(target)
+    // A different port on the same host is already a different origin
+    // (scheme+host+PORT), which is exactly what fetch()'s credential-leak
+    // protection keys on.
+    expect(new URL(targetUrl).port).not.toBe('')
+
+    const { server: hop, url: hopUrl } = await startServer((_req, res) => {
+      res.writeHead(302, { location: targetUrl + '/' })
+      res.end()
+    })
+    servers.push(hop)
+    expect(new URL(hopUrl).origin).not.toBe(new URL(targetUrl).origin)
+
+    await safeFetch(hopUrl + '/', {
+      allowHosts: ['127.0.0.1'],
+      headers: {
+        authorization: 'Bearer secret-token',
+        Cookie: 'session=secret',
+        'Proxy-Authorization': 'Basic secret',
+        'x-benign-header': 'keep-me'
+      }
+    })
+
+    expect(receivedByTarget.authorization).toBeUndefined()
+    expect(receivedByTarget.cookie).toBeUndefined()
+    expect(receivedByTarget['proxy-authorization']).toBeUndefined()
+    expect(receivedByTarget['x-benign-header']).toBe('keep-me')
+  })
+
+  it('keeps authorization/cookie on a same-origin redirect (same scheme, host and port)', async () => {
+    let receivedByTarget: http.IncomingHttpHeaders = {}
+    let redirected = false
+    const { server, url } = await startServer((req, res) => {
+      if (!redirected) {
+        redirected = true
+        res.writeHead(302, { location: '/next' })
+        res.end()
+        return
+      }
+      receivedByTarget = req.headers
+      res.end('ok')
+    })
+    servers.push(server)
+
+    await safeFetch(url + '/', {
+      allowHosts: ['127.0.0.1'],
+      headers: { authorization: 'Bearer secret-token' }
+    })
+
+    expect(receivedByTarget.authorization).toBe('Bearer secret-token')
+  })
+
   it('blocks a redirect that points at a private IP not covered by allowHosts', async () => {
     const { server, url } = await startServer((_req, res) => {
       res.writeHead(302, { location: 'http://10.0.0.5/internal' })
@@ -213,5 +271,32 @@ describe('safeFetch', () => {
 
     await safeFetch(url + '/', { allowHosts: ['127.0.0.1'] })
     expect(receivedUserAgent).toContain('ArticleSaverBot')
+  })
+
+  it('requests identity encoding by default, so responses are never compressed', async () => {
+    let receivedAcceptEncoding = ''
+    const { server, url } = await startServer((req, res) => {
+      receivedAcceptEncoding = req.headers['accept-encoding'] ?? ''
+      res.end('ok')
+    })
+    servers.push(server)
+
+    await safeFetch(url + '/', { allowHosts: ['127.0.0.1'] })
+    expect(receivedAcceptEncoding).toBe('identity')
+  })
+
+  it('lets the caller override the default accept-encoding', async () => {
+    let receivedAcceptEncoding = ''
+    const { server, url } = await startServer((req, res) => {
+      receivedAcceptEncoding = req.headers['accept-encoding'] ?? ''
+      res.end('ok')
+    })
+    servers.push(server)
+
+    await safeFetch(url + '/', {
+      allowHosts: ['127.0.0.1'],
+      headers: { 'Accept-Encoding': 'gzip' }
+    })
+    expect(receivedAcceptEncoding).toBe('gzip')
   })
 })

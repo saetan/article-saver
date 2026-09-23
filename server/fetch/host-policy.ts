@@ -68,6 +68,23 @@ function numericFamily(family: LookupOptions['family']): number {
 }
 
 /**
+ * `isBlockedIp` calls `ipaddr.parse`, which throws on anything it can't
+ * parse. That's fine when we control the input (an already-validated URL
+ * hostname), but addresses here come back from the OS resolver - if it ever
+ * returns something unparseable (a malformed scope id, a resolver bug,
+ * etc.), a bare throw would escape the `dns.lookup` callback below as an
+ * uncaught exception instead of surfacing as a normal `callback(err)`. We
+ * default-deny: treat "can't tell if it's safe" the same as "not safe".
+ */
+function isBlockedIpSafe(address: string): boolean {
+  try {
+    return isBlockedIp(address)
+  } catch {
+    return true
+  }
+}
+
+/**
  * Builds a `dns.lookup`-compatible function to pass as an undici
  * `Agent`'s `connect.lookup` option.
  *
@@ -101,7 +118,7 @@ export function createSafeLookup(url: string, opts: HostPolicyOptions): LookupFu
         const resolved = addresses as unknown as LookupAddress[]
         const allowed = bypass
           ? resolved
-          : resolved.filter((candidate) => !isBlockedIp(candidate.address))
+          : resolved.filter((candidate) => !isBlockedIpSafe(candidate.address))
 
         if (allowed.length === 0) {
           callback(

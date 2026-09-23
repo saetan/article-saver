@@ -165,6 +165,41 @@ describe('createSafeLookup', () => {
       })
     ).rejects.toThrow('ENOTFOUND')
   })
+
+  it('treats an unparseable resolved address as blocked instead of throwing', async () => {
+    // isBlockedIp() calls ipaddr.parse(), which throws on anything it can't
+    // parse. A resolver returning garbage should surface as a normal
+    // BlockedUrlError callback, never as an uncaught exception escaping the
+    // dns.lookup callback.
+    mockDnsLookup([{ address: 'not-an-ip-address', family: 4 }] as never)
+    const lookup = createSafeLookup('http://garbage.example/', {})
+
+    await expect(
+      new Promise((resolve, reject) => {
+        lookup('garbage.example', { family: 0, hints: 0 }, (err, address) => {
+          if (err) reject(err)
+          else resolve(address)
+        })
+      })
+    ).rejects.toBeInstanceOf(BlockedUrlError)
+  })
+
+  it('drops only the unparseable addresses when DNS returns a mix of garbage and a public address', async () => {
+    mockDnsLookup([
+      { address: 'not-an-ip-address', family: 4 },
+      { address: '93.184.216.34', family: 4 }
+    ] as never)
+    const lookup = createSafeLookup('http://mixed-garbage.example/', {})
+
+    const result = await new Promise((resolve, reject) => {
+      lookup('mixed-garbage.example', { all: true, family: 0, hints: 0 }, (err, addresses) => {
+        if (err) reject(err)
+        else resolve(addresses)
+      })
+    })
+
+    expect(result).toEqual([{ address: '93.184.216.34', family: 4 }])
+  })
 })
 
 beforeEach(() => {
