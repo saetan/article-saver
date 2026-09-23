@@ -68,6 +68,21 @@ Drizzle schemas, migrations and repositories live under `server/db/` and `server
 - Commit messages follow [Conventional Commits](https://www.conventionalcommits.org/).
 - **Never commit secrets.** Use `.env` locally and Replit Secrets in production.
 
+### Pre-commit hooks
+
+Commits are checked locally by a Husky pre-commit hook (see [ADR 0012](docs/decisions/0012-testing-and-ci-strategy.md) and [ADR 0014](docs/decisions/0014-secrets-handling.md)):
+
+1. **gitleaks** scans staged changes for secrets, using the ruleset in [`.gitleaks.toml`](.gitleaks.toml) (the default gitleaks rules, plus an allowlist for the placeholder values in `.env.example`). The commit is blocked if gitleaks isn't installed or finds a match.
+2. **lint-staged** runs ESLint (`--fix`) and Prettier (`--write`) on staged files.
+
+Install gitleaks once per machine:
+
+```sh
+brew install gitleaks
+```
+
+The hooks are installed automatically by `pnpm install` (via the `prepare` script). gitleaks also runs in CI so a bypassed local hook (`--no-verify`) is still caught.
+
 ## License
 
 [MIT](LICENSE)
