@@ -27,15 +27,30 @@ The reasoning behind each choice lives in [`docs/decisions/`](docs/decisions/). 
 
 ## Development
 
-Setup instructions will land with the M0 scaffold. In short:
+Requires Node 24+ (see `.nvmrc`) and pnpm.
 
 ```sh
-cp .env.example .env   # fill in values; never commit .env
+cp .env.example .env  # fill in values; never commit .env
 pnpm install
-pnpm dev
+pnpm dev               # http://localhost:3000
 ```
 
-Postgres for local development and integration tests runs in a container (Docker or Podman — see [ADR 0012](docs/decisions/0012-testing-and-ci-strategy.md)).
+Other scripts:
+
+```sh
+pnpm build         # production build
+pnpm preview        # preview the production build
+pnpm lint           # eslint
+pnpm format         # prettier --write
+pnpm format:check   # prettier --check
+pnpm typecheck      # nuxt typecheck (strict TypeScript)
+pnpm test           # unit test suite
+pnpm test:unit      # vitest "unit" project only
+```
+
+The app is a Nuxt 4 SPA (`ssr: false`, `app/` directory layout) with a Nitro API under `server/`. `GET /api/health` returns `{ ok: true }`.
+
+Postgres for local development and integration tests runs in a container (Docker or Podman — see [ADR 0012](docs/decisions/0012-testing-and-ci-strategy.md)). It is not required for this M0 scaffold, which has no database yet.
 
 ## Contributing workflow
 
