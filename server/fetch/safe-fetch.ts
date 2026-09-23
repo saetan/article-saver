@@ -32,6 +32,15 @@ export interface SafeFetchResponse {
   text(): string
 }
 
+/**
+ * Validates protocol and credentials. We deliberately do not restrict the
+ * port: once the IP-range checks in `host-policy.ts` are enforced, the
+ * meaningful SSRF exposure is *which host* a request can reach, not which
+ * port on an already-blocked host - an attacker who can reach a private IP
+ * at all can pick any port on it, and legitimate self-hosted article sites
+ * sometimes run on non-standard ports. Restricting to 80/443 would add
+ * friction without closing a real gap.
+ */
 function validateUrl(input: string): URL {
   let url: URL
   try {

@@ -35,7 +35,11 @@ describe('isBlockedIp', () => {
     ['64:ff9b::7f00:1', 'NAT64 wrapping loopback (127.0.0.1)'],
     ['64:ff9b::a00:1', 'NAT64 wrapping private (10.0.0.1)'],
     ['2001::1', 'Teredo tunnelling'],
-    ['2002::1', '6to4 tunnelling']
+    ['2002::1', '6to4 tunnelling'],
+    [
+      '64:ff9b::808:808',
+      'NAT64 wrapping a public IPv4 (8.8.8.8) - intentionally over-blocked, see ip-classify.ts'
+    ]
   ])('blocks %s (%s)', (address) => {
     expect(isBlockedIp(address)).toBe(true)
   })

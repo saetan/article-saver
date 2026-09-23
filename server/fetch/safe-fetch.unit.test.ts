@@ -1,6 +1,7 @@
+import dns from 'node:dns'
 import http, { type Server } from 'node:http'
 import type { AddressInfo } from 'node:net'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { safeFetch } from './safe-fetch'
 import {
   BlockedUrlError,
@@ -31,6 +32,7 @@ describe('safeFetch', () => {
   afterEach(async () => {
     await Promise.all(servers.map(stopServer))
     servers = []
+    vi.restoreAllMocks()
   })
 
   it('rejects non-http(s) protocols', async () => {
@@ -60,6 +62,29 @@ describe('safeFetch', () => {
 
   it('blocks an IPv4-mapped IPv6 loopback literal', async () => {
     await expect(safeFetch('http://[::ffff:127.0.0.1]:1/')).rejects.toBeInstanceOf(BlockedUrlError)
+  })
+
+  it('blocks a hostname (not an IP literal) whose DNS resolution is entirely non-public', async () => {
+    // Unlike the literal-IP tests above (caught by the assertHostAllowedIfLiteral
+    // fast path before any connection is attempted), this exercises the other
+    // path: a real hostname that goes through the undici Agent's connect.lookup
+    // (createSafeLookup) at actual connect time. See host-policy.unit.test.ts's
+    // "drops private addresses and keeps only public ones when DNS returns a
+    // mix" for coverage of the mixed-address filtering logic in isolation.
+    vi.spyOn(dns, 'lookup').mockImplementation(((...args: unknown[]) => {
+      const callback = args[2] as (
+        err: null,
+        addrs: Array<{ address: string; family: number }>
+      ) => void
+      callback(null, [
+        { address: '10.0.0.5', family: 4 },
+        { address: '127.0.0.1', family: 4 }
+      ])
+    }) as typeof dns.lookup)
+
+    await expect(safeFetch('http://internal.article-saver.test/')).rejects.toBeInstanceOf(
+      BlockedUrlError
+    )
   })
 
   it('succeeds against a local stub server via the test-only allowHosts override', async () => {
