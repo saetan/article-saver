@@ -1,7 +1,10 @@
 allowBuilds:
   '@parcel/watcher': false
   '@tailwindcss/oxide': false
+  cpu-features: false
   esbuild: false
+  protobufjs: false
+  ssh2: false
   unrs-resolver: false
   vue-demi: false
 minimumReleaseAgeExclude:
