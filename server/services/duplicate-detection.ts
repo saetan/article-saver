@@ -51,7 +51,7 @@ export async function assertNotDuplicate(
   url: string
 ): Promise<string> {
   const canonicalUrl = canonicalizeUrl(url)
-  const existing = await findDuplicate(repo, userId, url)
+  const existing = await repo.findByCanonicalUrl(userId, canonicalUrl)
   if (existing) throw new DuplicateItemError(existing.id, existing.createdAt)
   return canonicalUrl
 }

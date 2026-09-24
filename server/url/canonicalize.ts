@@ -52,15 +52,31 @@ function isTrackingParam(key: string, host: string): boolean {
   return false
 }
 
+/** The only schemes `canonicalizeUrl` accepts (ADR 0008: https-only fetching; http is normalised to https below, not rejected). */
+const ACCEPTED_SCHEMES = new Set(['http:', 'https:'])
+
 /**
  * Normalises a URL into a stable, comparable form for duplicate detection
- * (ADR 0013). Pure: no network access, no I/O.
+ * (ADR 0013, amended for https normalisation and trailing-dot hosts). Pure:
+ * no network access, no I/O.
  *
  * Rules:
- * - Scheme and host are lower-cased; default ports (`:80`, `:443`) removed.
- * - Known social hosts collapse onto one canonical host: `twitter.com` and
- *   `mobile.twitter.com` become `x.com`; `www.` is dropped for `x.com`,
- *   `threads.net` and `instagram.com` specifically (not hosts generally).
+ * - Only `http:`/`https:` URLs are accepted; anything else (`javascript:`,
+ *   `mailto:`, `ftp:`, `data:`, …) throws, since this is the input gate for
+ *   everything the user saves.
+ * - The scheme is normalised to `https:` (ADR 0008: the app only ever
+ *   fetches over https, and the same page shouldn't dedupe differently
+ *   depending on which scheme a link happened to use). The host is
+ *   lower-cased and a single trailing `.` is stripped before alias lookup
+ *   (`example.com.` and `example.com` name the same host).
+ * - Default ports are removed based on the *original* scheme, before the
+ *   https normalisation above: `http://host:80/…` drops the port (80 is
+ *   http's default), but `http://host:443/…` keeps `:443` (443 is not
+ *   http's default, even though the output scheme is https).
+ * - Known social hosts collapse onto one canonical host: `twitter.com`,
+ *   `mobile.twitter.com` and `www.twitter.com` become `x.com`; `www.` is
+ *   dropped for `x.com`, `threads.net` and `instagram.com` specifically
+ *   (not hosts generally).
  * - The `#fragment` is dropped.
  * - The path's trailing slash is trimmed, except for the root `/`.
  * - Known tracking query params (`utm_*`, `fbclid`, `gclid`, `si`, `igsh`,
@@ -70,7 +86,8 @@ function isTrackingParam(key: string, host: string): boolean {
  *   than tracking noise. Remaining params are sorted by key (then value)
  *   for stability.
  *
- * @throws {InvalidCanonicalUrlError} if `url` cannot be parsed as a URL.
+ * @throws {InvalidCanonicalUrlError} if `url` cannot be parsed, or uses a
+ *   scheme other than `http:`/`https:`.
  */
 export function canonicalizeUrl(url: string): string {
   let parsed: URL
@@ -80,11 +97,17 @@ export function canonicalizeUrl(url: string): string {
     throw new InvalidCanonicalUrlError(url, error)
   }
 
-  const scheme = parsed.protocol.toLowerCase()
+  const originalScheme = parsed.protocol.toLowerCase()
+  if (!ACCEPTED_SCHEMES.has(originalScheme)) {
+    throw new InvalidCanonicalUrlError(url)
+  }
+  const scheme = 'https:'
+
   let host = parsed.hostname.toLowerCase()
+  if (host.endsWith('.')) host = host.slice(0, -1)
   host = HOST_ALIASES[host] ?? host
 
-  const port = parsed.port && parsed.port !== DEFAULT_PORTS[scheme] ? `:${parsed.port}` : ''
+  const port = parsed.port && parsed.port !== DEFAULT_PORTS[originalScheme] ? `:${parsed.port}` : ''
 
   let path = parsed.pathname
   if (path.length > 1 && path.endsWith('/')) path = path.slice(0, -1)

@@ -32,11 +32,61 @@ describe('canonicalizeUrl', () => {
   })
 
   it('removes the default http port', () => {
-    expect(canonicalizeUrl('http://example.com:80/post')).toBe('http://example.com/post')
+    expect(canonicalizeUrl('http://example.com:80/post')).toBe('https://example.com/post')
   })
 
   it('keeps a non-default port', () => {
     expect(canonicalizeUrl('https://example.com:8443/post')).toBe('https://example.com:8443/post')
+  })
+
+  describe('scheme', () => {
+    it('accepts http and normalises it to https', () => {
+      expect(canonicalizeUrl('http://example.com/post')).toBe('https://example.com/post')
+    })
+
+    it('treats http and https versions of the same page as identical', () => {
+      expect(canonicalizeUrl('http://example.com/post')).toBe(
+        canonicalizeUrl('https://example.com/post')
+      )
+    })
+
+    it('keeps a port that is not the default for the original scheme, even once normalised to https', () => {
+      // 443 is not http's default port (80 is), so it is not dropped even
+      // though the output scheme becomes https.
+      expect(canonicalizeUrl('http://example.com:443/post')).toBe('https://example.com:443/post')
+    })
+
+    it('drops the default http port even though the output scheme is https', () => {
+      expect(canonicalizeUrl('http://example.com:80/post')).toBe('https://example.com/post')
+    })
+
+    it('rejects javascript: URLs', () => {
+      expect(() => canonicalizeUrl('javascript:alert(1)')).toThrow(InvalidCanonicalUrlError)
+    })
+
+    it('rejects mailto: URLs', () => {
+      expect(() => canonicalizeUrl('mailto:someone@example.com')).toThrow(InvalidCanonicalUrlError)
+    })
+
+    it('rejects ftp: URLs', () => {
+      expect(() => canonicalizeUrl('ftp://example.com/file')).toThrow(InvalidCanonicalUrlError)
+    })
+
+    it('rejects data: URLs', () => {
+      expect(() => canonicalizeUrl('data:text/plain,hello')).toThrow(InvalidCanonicalUrlError)
+    })
+  })
+
+  describe('trailing-dot hosts', () => {
+    it('strips a single trailing dot from the host', () => {
+      expect(canonicalizeUrl('https://example.com./post')).toBe('https://example.com/post')
+    })
+
+    it('applies host aliasing after stripping the trailing dot', () => {
+      expect(canonicalizeUrl('https://twitter.com./user/status/1')).toBe(
+        'https://x.com/user/status/1'
+      )
+    })
   })
 
   describe('tracking params', () => {

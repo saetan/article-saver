@@ -38,7 +38,7 @@ Where an Item is in the user's reading flow: `unread`, `read`, `archived`. Indep
 A user-defined label. An Item can have many Tags. Tags replace folders.
 
 **Canonical URL**
-The normalised form of an Item's URL used for duplicate detection: lower-cased host, tracking params (`utm_*`, `fbclid`, `si`, …) and `#fragment` removed, trailing slash trimmed, `twitter.com` ≡ `x.com`.
+The normalised form of an Item's URL used for duplicate detection (ADR 0013): `http`/`https` only (other schemes are rejected), scheme normalised to `https`, host lower-cased with a trailing `.` stripped, tracking params (`utm_*`, `fbclid`, `gclid`, `si`, `igsh`, `igshid`, `mc_cid`, `mc_eid`, `ref_src`, `ref_url`, X's `s`/`t` share params on `x.com` only) and `#fragment` removed, trailing slash trimmed, `twitter.com`/`mobile.twitter.com`/`www.twitter.com`/`www.x.com` ≡ `x.com`, `www.` also dropped for `threads.net` and `instagram.com`.
 
 **Duplicate**
 A capture whose Canonical URL matches an existing Item of the same user. Duplicates are **not** saved; the user is told the Item already exists and linked to it (API: `409 Conflict`).
