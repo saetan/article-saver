@@ -8,7 +8,7 @@ vi.mock('@clerk/nuxt/server', () => ({
 }))
 
 // Imported after the mock so the mocked module is in place first.
-const { default: authMiddleware } = await import('./auth')
+const { default: authMiddleware } = await import('./01.auth')
 const { useUserEmailCache } = await import('../auth/user-email-cache')
 
 const VERIFIED_USER = {

@@ -10,8 +10,13 @@ const PUBLIC_API_PATHS = new Set(['/api/health'])
 
 /**
  * Authorises every `/api/**` request (ADR 0002, 0005), except the public
- * `/api/health` check. Runs after `@clerk/nuxt`'s own middleware, which
- * populates `event.context.auth`.
+ * `/api/health` check. Must run after `server/middleware/00.clerk.ts`,
+ * which populates `event.context.auth` — the `00.`/`01.` filename prefixes
+ * are load-bearing: Nitro loads `server/middleware/*` alphabetically, and
+ * `clerk.skipServerMiddleware: true` in `nuxt.config.ts` stops the module
+ * auto-registering its middleware elsewhere in the chain (it was found
+ * running after this file, making every request look unauthenticated —
+ * security review round 2, #5). See `server/middleware/order.unit.test.ts`.
  *
  * - No Clerk session -> 401.
  * - Signed in, but the primary email isn't verified or isn't in

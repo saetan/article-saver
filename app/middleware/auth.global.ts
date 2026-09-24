@@ -63,9 +63,24 @@ export default defineNuxtRouteMiddleware(async (to) => {
       await $fetch('/api/me')
       access.value = { userId: currentUserId, status: 'allowed' }
     } catch (error) {
-      if (isForbidden(error)) {
+      const statusCode = getStatusCode(error)
+
+      if (statusCode === 403) {
         access.value = { userId: currentUserId, status: 'forbidden' }
+      } else if (statusCode === 401) {
+        // Clerk's client thinks we're signed in but the server doesn't
+        // (a stale/expired session, clock skew, cookie not propagated
+        // yet, ...) — security review round 2, #5. Don't throw and let
+        // Nuxt render an error page for what's really just "please sign
+        // in again"; sign out client-side and send the user back to
+        // /sign-in instead.
+        access.value = { userId: null, status: 'unknown' }
+        const clerk = useClerk()
+        await clerk.value?.signOut()
+        return navigateTo({ path: '/sign-in', query: { reason: 'session-expired' } })
       } else {
+        // Anything else (network failure, 500, ...) is genuinely
+        // unexpected — let it surface as an error.
         throw error
       }
     }
@@ -76,11 +91,8 @@ export default defineNuxtRouteMiddleware(async (to) => {
   }
 })
 
-function isForbidden(error: unknown): boolean {
-  return (
-    typeof error === 'object' &&
-    error !== null &&
-    'statusCode' in error &&
-    (error as { statusCode?: number }).statusCode === 403
-  )
+function getStatusCode(error: unknown): number | undefined {
+  if (typeof error !== 'object' || error === null || !('statusCode' in error)) return undefined
+  const statusCode = (error as { statusCode?: unknown }).statusCode
+  return typeof statusCode === 'number' ? statusCode : undefined
 }
