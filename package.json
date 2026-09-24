@@ -15,7 +15,10 @@
     "format:check": "prettier --check .",
     "typecheck": "nuxt typecheck",
     "test:unit": "vitest run --project unit",
-    "test": "pnpm test:unit",
+    "test:integration:sqlite": "TEST_DIALECT=sqlite vitest run --project integration",
+    "test:integration:postgres": "TEST_DIALECT=postgres node scripts/testcontainers-env.mjs vitest run --project integration",
+    "test:integration": "pnpm test:integration:sqlite && pnpm test:integration:postgres",
+    "test": "pnpm test:unit && pnpm test:integration",
     "db:generate": "node scripts/db.mjs generate",
     "db:migrate": "node scripts/db.mjs migrate",
     "prepare": "husky || true"
@@ -38,6 +41,7 @@
   },
   "devDependencies": {
     "@nuxt/eslint": "^1.17.0",
+    "@testcontainers/postgresql": "^12.1.0",
     "@types/node": "^24.13.6",
     "drizzle-kit": "^0.31.11",
     "eslint": "^10.11.0",
@@ -46,6 +50,7 @@
     "husky": "^9.1.7",
     "lint-staged": "^17.5.1",
     "prettier": "^3.9.9",
+    "testcontainers": "^12.1.0",
     "typescript": "^6.0.3",
     "vitest": "^5.0.1",
     "vue-tsc": "^3.3.11"

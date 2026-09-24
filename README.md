@@ -44,8 +44,11 @@ pnpm lint           # eslint
 pnpm format         # prettier --write
 pnpm format:check   # prettier --check
 pnpm typecheck      # nuxt typecheck (strict TypeScript)
-pnpm test           # unit test suite
-pnpm test:unit      # vitest "unit" project only
+pnpm test                      # unit + integration (both dialects)
+pnpm test:unit                 # vitest "unit" project only (no containers)
+pnpm test:integration          # vitest "integration" project, sqlite then postgres
+pnpm test:integration:sqlite   # integration project against file-based SQLite
+pnpm test:integration:postgres # integration project against Postgres (Testcontainers)
 pnpm db:generate    # generate a migration for DB_DIALECT (sqlite | postgres)
 pnpm db:migrate     # apply pending migrations for DB_DIALECT
 ```
@@ -53,6 +56,41 @@ pnpm db:migrate     # apply pending migrations for DB_DIALECT
 The app is a Nuxt 4 SPA (`ssr: false`, `app/` directory layout) with a Nitro API under `server/`. `GET /api/health` returns `{ ok: true }`.
 
 Postgres for local development and integration tests runs in a container (Docker or Podman — see [ADR 0012](docs/decisions/0012-testing-and-ci-strategy.md)).
+
+### Testing (ADR 0012)
+
+Two Vitest projects:
+
+- **`unit`** (`**/*.unit.test.ts`) — no database, no containers. `pnpm test:unit`.
+- **`integration`** (`**/*.integration.test.ts`) — runs the same repository contract suites (`server/repositories/*-repository.contract.ts`) that the `unit` project runs against in-memory SQLite, but here against a **real database**: file-based SQLite, or Postgres via `@testcontainers/postgresql`. Which dialect is selected by the `TEST_DIALECT` env var (`sqlite` | `postgres`, default `sqlite`) — this is what lets CI (#8) run the same suite as a `[sqlite, postgres]` matrix.
+  - `pnpm test:integration:sqlite` — fast, no containers; each test gets its own temp SQLite file.
+  - `pnpm test:integration:postgres` — starts **one** Postgres 17 Testcontainer for the whole run (Vitest `globalSetup`), migrates it, then truncates all tables before each test for isolation.
+  - `pnpm test:integration` runs both, sqlite then postgres.
+
+`pnpm test` runs `test:unit` then `test:integration`.
+
+#### Podman (local container engine)
+
+The container engine locally is **Podman**, with a running `podman machine`. `pnpm test:integration:postgres` runs through `scripts/testcontainers-env.mjs`, which — if `DOCKER_HOST` isn't already set — resolves it from `podman machine inspect --format '{{.ConnectionInfo.PodmanSocket.Path}}'` and sets `TESTCONTAINERS_RYUK_DISABLED=true` (Ryuk, Testcontainers' usual cleanup sidecar, doesn't run reliably under Podman). No manual env setup is needed; just make sure your Podman machine is running (`podman machine start`). The started container is stopped explicitly in Vitest's `globalTeardown` since Ryuk is disabled.
+
+On GitHub Actions runners (plain Docker), `DOCKER_HOST` is already correct and this script is a no-op — the same command works unchanged.
+
+If you ever need to set it manually:
+
+```sh
+export DOCKER_HOST="unix://$(podman machine inspect --format '{{.ConnectionInfo.PodmanSocket.Path}}')"
+export TESTCONTAINERS_RYUK_DISABLED=true
+```
+
+#### Local Postgres for `DB_DIALECT=postgres` dev
+
+`compose.yaml` runs Postgres 17 plus [Adminer](https://www.adminer.org/) (a DB UI) on credentials matching `.env.example`'s `DATABASE_URL`:
+
+```sh
+podman compose up -d      # or: docker compose up -d
+```
+
+Postgres is on `localhost:5432` (`article_saver` / `article_saver` / `article_saver`), Adminer on `http://localhost:8080`. Tear down with `podman compose down -v`.
 
 ### Database (ADR 0006)
 
