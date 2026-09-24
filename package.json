@@ -24,6 +24,7 @@
     "@iconify-json/simple-icons": "^1.2.96",
     "@libsql/client": "^0.18.0",
     "@nuxt/ui": "^4.11.1",
+    "@replit/object-storage": "^1.0.0",
     "drizzle-orm": "^0.45.3",
     "nuxt": "^4.5.2",
     "postgres": "^3.4.9",
@@ -32,6 +33,7 @@
   },
   "devDependencies": {
     "@nuxt/eslint": "^1.17.0",
+    "@types/node": "^24.13.6",
     "drizzle-kit": "^0.31.11",
     "eslint": "^10.11.0",
     "eslint-config-prettier": "^10.1.8",
