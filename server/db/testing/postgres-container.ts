@@ -1,20 +1,24 @@
-import { writeFile, rm } from 'node:fs/promises'
 import postgres from 'postgres'
 import { drizzle } from 'drizzle-orm/postgres-js'
 import { migrate } from 'drizzle-orm/postgres-js/migrator'
 import { PostgreSqlContainer } from '@testcontainers/postgresql'
+import type { TestProject } from 'vitest/node'
 import { resolveEnv } from '../../../scripts/testcontainers-env.mjs'
-import { POSTGRES_CONFIG_PATH } from './config-path'
+// `./provided-context.d.ts` augments Vitest's ProvidedContext type; it has
+// no runtime output, so it's picked up by the TS program (tsconfig's
+// `include`) rather than imported here.
 
 /**
  * Vitest `globalSetup` for the `integration` project. Starts a single
- * Postgres 17 Testcontainer for the whole test run, migrates it, and writes
- * its connection string to a temp file for `postgres-integration.ts`
- * (a separate process) to pick up. A no-op unless `TEST_DIALECT=postgres`,
- * so the SQLite run (and the `unit` project) never touches a container
- * engine (ADR 0012, #4).
+ * Postgres 17 Testcontainer for the whole test run, migrates it, and hands
+ * its connection string to test files via Vitest's `provide`/`inject`
+ * (see `provided-context.d.ts`) rather than a shared file, so two
+ * integration runs happening at once (e.g. two agent worktrees) can't
+ * clobber each other's connection info. A no-op unless
+ * `TEST_DIALECT=postgres`, so the SQLite run (and the `unit` project) never
+ * touches a container engine (ADR 0012, #4).
  */
-export default async function setup() {
+export default async function setup(project: TestProject) {
   if (process.env.TEST_DIALECT !== 'postgres') {
     return async () => {}
   }
@@ -41,10 +45,9 @@ export default async function setup() {
     await migrationClient.end()
   }
 
-  await writeFile(POSTGRES_CONFIG_PATH, JSON.stringify({ connectionString }), 'utf8')
+  project.provide('postgresConnectionString', connectionString)
 
   return async () => {
-    await rm(POSTGRES_CONFIG_PATH, { force: true })
     // Explicit stop: Ryuk (Testcontainers' usual cleanup sidecar) is
     // disabled under Podman (see scripts/testcontainers-env.mjs), so
     // nothing else will stop this container.

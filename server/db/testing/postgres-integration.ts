@@ -1,22 +1,23 @@
-import { readFileSync } from 'node:fs'
+import { inject } from 'vitest'
 import { sql } from 'drizzle-orm'
 import { createPostgresDbContext } from '../postgres-client'
 import type { PostgresDbContext } from '../postgres-client'
-import { POSTGRES_CONFIG_PATH } from './config-path'
+// `./provided-context.d.ts` augments Vitest's ProvidedContext type; it has
+// no runtime output, so it's picked up by the TS program (tsconfig's
+// `include`) rather than imported here.
 
 let cached: PostgresDbContext | undefined
 
 function readConnectionString(): string {
-  let raw: string
-  try {
-    raw = readFileSync(POSTGRES_CONFIG_PATH, 'utf8')
-  } catch {
+  const connectionString = inject('postgresConnectionString')
+  if (!connectionString) {
     throw new Error(
       'No Postgres integration container found. Run this suite via `pnpm test:integration:postgres` ' +
-        '(TEST_DIALECT=postgres), which starts and migrates the container in globalSetup.'
+        '(TEST_DIALECT=postgres), which starts and migrates the container, and provides its connection ' +
+        'string to tests, in globalSetup (see postgres-container.ts).'
     )
   }
-  return (JSON.parse(raw) as { connectionString: string }).connectionString
+  return connectionString
 }
 
 // Truncated in FK-safe order (children before parents); CASCADE makes the

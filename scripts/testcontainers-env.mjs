@@ -10,6 +10,7 @@
 // `server/db/testing/postgres-container.ts` stops the container itself in
 // globalTeardown.
 import { spawnSync } from 'node:child_process'
+import { pathToFileURL } from 'node:url'
 
 function podmanSocketPath() {
   const result = spawnSync(
@@ -42,7 +43,7 @@ export { resolveEnv, podmanSocketPath }
 // execs `command` with the resolved environment. Guarded so importing this
 // module (e.g. from vitest's globalSetup, running in a worker thread with
 // its own unrelated argv) never triggers this.
-const isMain = process.argv[1] && import.meta.url === `file://${process.argv[1]}`
+const isMain = process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href
 if (isMain) {
   const [command, ...args] = process.argv.slice(2)
   if (!command) {
