@@ -187,6 +187,9 @@ importers:
       drizzle-orm:
         specifier: ^0.45.3
         version: 0.45.3(@libsql/client@0.18.0)(postgres@3.4.9)
+      h3:
+        specifier: ^1.15.11
+        version: 1.15.11
       ipaddr.js:
         specifier: ^2.5.0
         version: 2.5.0
@@ -224,9 +227,6 @@ importers:
       eslint-plugin-better-tailwindcss:
         specifier: ^4.7.0
         version: 4.7.0(eslint@10.11.0(jiti@2.7.0)(supports-color@10.2.2))(tailwindcss@4.3.3)(typescript@6.0.3)
-      h3:
-        specifier: 1.15.11
-        version: 1.15.11
       husky:
         specifier: ^9.1.7
         version: 9.1.7

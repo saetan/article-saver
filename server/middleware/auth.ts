@@ -39,6 +39,10 @@ export default defineEventHandler(async (event) => {
   const cache = useUserEmailCache()
   let email = cache.get(userId)
   if (email === undefined) {
+    // `event` is cast here because `@clerk/nuxt`'s `clerkClient` types its
+    // parameter against its own bundled copy of h3's `H3Event`, distinct
+    // from (structurally, not just nominally) the one Nitro gives us —
+    // it's the same object at runtime, just two separate type declarations.
     const user = await clerkClient(event as Parameters<typeof clerkClient>[0]).users.getUser(userId)
     email = resolvePrimaryVerifiedEmail(user)
     cache.set(userId, email)

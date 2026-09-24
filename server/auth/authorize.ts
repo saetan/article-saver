@@ -1,3 +1,5 @@
+import { normalizeEmail } from './allowlist'
+
 export interface AuthorizeRequestInput {
   /** The authenticated Clerk user id, or `null`/`undefined` if unauthenticated. */
   userId: string | null | undefined
@@ -43,8 +45,7 @@ export function authorizeRequest(input: AuthorizeRequestInput): AuthorizeResult 
     return { authorized: false, status: 403 }
   }
 
-  const normalizedEmail = input.primaryVerifiedEmail.trim().toLowerCase()
-  if (!input.allowlist.includes(normalizedEmail)) {
+  if (!input.allowlist.includes(normalizeEmail(input.primaryVerifiedEmail))) {
     return { authorized: false, status: 403 }
   }
 
