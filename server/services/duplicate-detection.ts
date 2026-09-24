@@ -38,13 +38,12 @@ export async function findDuplicate(
  * already has an Item with that canonical URL. Otherwise returns the
  * canonical URL, ready to pass to `ItemRepository.create`.
  *
- * This closes the common check-then-create race the same way
- * `ItemRepository.create`'s `DuplicateCanonicalUrlError` does at the
- * database level (the unique `(user_id, canonical_url)` index is still the
- * source of truth): callers should still be prepared to catch
- * `DuplicateCanonicalUrlError` from `create` and translate it, e.g. via
- * {@link findDuplicate}, in case of a concurrent save between this check and
- * the insert.
+ * This is a pre-flight check, not a lock: the unique `(user_id,
+ * canonical_url)` index is still the source of truth. A concurrent save
+ * between this check and the following `create` will surface as
+ * `DuplicateCanonicalUrlError` from `create` itself, not from here — callers
+ * (e.g. #12's save endpoint) must catch that too and translate it the same
+ * way, e.g. by re-running {@link findDuplicate}.
  */
 export async function assertNotDuplicate(
   repo: ItemRepository,
@@ -52,7 +51,7 @@ export async function assertNotDuplicate(
   url: string
 ): Promise<string> {
   const canonicalUrl = canonicalizeUrl(url)
-  const existing = await repo.findByCanonicalUrl(userId, canonicalUrl)
+  const existing = await findDuplicate(repo, userId, url)
   if (existing) throw new DuplicateItemError(existing.id, existing.createdAt)
   return canonicalUrl
 }

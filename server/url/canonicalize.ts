@@ -23,10 +23,17 @@ const TRACKING_PARAMS = new Set([
 /** `s` and `t` are only tracking noise on X's share links; elsewhere they can be functional. */
 const X_SHARE_PARAMS = new Set(['s', 't'])
 
-/** Hosts that collapse onto a single canonical host. */
+/**
+ * Hosts that collapse onto a single canonical host. ADR 0013 and
+ * `CONTEXT.md` name `twitter.com` ≡ `x.com`; this extends that to the
+ * `mobile.` and `www.` variants people actually paste, and applies the same
+ * "drop `www.`" treatment to the other social hosts `CONTEXT.md`'s Item
+ * types cover (`threads_post`, `instagram_post`).
+ */
 const HOST_ALIASES: Record<string, string> = {
   'twitter.com': 'x.com',
   'mobile.twitter.com': 'x.com',
+  'www.twitter.com': 'x.com',
   'www.x.com': 'x.com',
   'www.threads.net': 'threads.net',
   'www.instagram.com': 'instagram.com'

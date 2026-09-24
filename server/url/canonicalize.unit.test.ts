@@ -107,6 +107,12 @@ describe('canonicalizeUrl', () => {
       )
     })
 
+    it('maps www.twitter.com to x.com', () => {
+      expect(canonicalizeUrl('https://www.twitter.com/user/status/1')).toBe(
+        'https://x.com/user/status/1'
+      )
+    })
+
     it('maps www.x.com to x.com', () => {
       expect(canonicalizeUrl('https://www.x.com/user/status/1')).toBe('https://x.com/user/status/1')
     })
