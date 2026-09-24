@@ -54,15 +54,62 @@ describe('auth middleware', () => {
 
   it('401s an unauthenticated request to a protected API route', async () => {
     const event = fakeEvent('/api/me', null)
-    await expect(authMiddleware(event)).rejects.toMatchObject({ statusCode: 401 })
+    await expect(authMiddleware(event)).rejects.toMatchObject({
+      statusCode: 401,
+      statusMessage: 'Unauthorized (auth middleware)'
+    })
     expect(getUserMock).not.toHaveBeenCalled()
+  })
+
+  describe('path normalisation (security review round 1, #5: percent-encoding bypass)', () => {
+    const bypassAttempts: Array<[label: string, path: string]> = [
+      ['percent-encoded prefix', '/%61pi/me'],
+      ['percent-encoded mid-segment', '/api/%6de'],
+      ['doubled leading slash', '//api/me'],
+      ['upper-cased prefix', '/API/me'],
+      ['leading dot segment', '/./api/me'],
+      ['dot-dot segment escaping to another route', '/api/health/../me'],
+      ['encoded slash inside a dot-dot segment', '/api/health%2F..%2Fme']
+    ]
+
+    it.each(bypassAttempts)(
+      'still 401s an unauthenticated request to %s (%s)',
+      async (_label, path) => {
+        const event = fakeEvent(path, null)
+        await expect(authMiddleware(event)).rejects.toMatchObject({
+          statusCode: 401,
+          statusMessage: 'Unauthorized (auth middleware)'
+        })
+        expect(getUserMock).not.toHaveBeenCalled()
+      }
+    )
+
+    it('does not conflate /api/healthz with the public /api/health', async () => {
+      const event = fakeEvent('/api/healthz', null)
+      await expect(authMiddleware(event)).rejects.toMatchObject({ statusCode: 401 })
+    })
+
+    it('still treats a trailing-slash /api/health/ as the public route', async () => {
+      const event = fakeEvent('/api/health/', null)
+      await expect(authMiddleware(event)).resolves.toBeUndefined()
+      expect(getUserMock).not.toHaveBeenCalled()
+    })
+
+    it('rejects a malformed percent-encoding with 400 rather than skipping auth', async () => {
+      const event = fakeEvent('/api/%E0%A4%A', null)
+      await expect(authMiddleware(event)).rejects.toMatchObject({ statusCode: 400 })
+      expect(getUserMock).not.toHaveBeenCalled()
+    })
   })
 
   it('403s an authenticated user whose email is not allowlisted', async () => {
     getUserMock.mockResolvedValue(VERIFIED_USER)
     process.env.ALLOWED_EMAILS = 'someone-else@example.com'
     const event = fakeEvent('/api/me', 'user_1')
-    await expect(authMiddleware(event)).rejects.toMatchObject({ statusCode: 403 })
+    await expect(authMiddleware(event)).rejects.toMatchObject({
+      statusCode: 403,
+      statusMessage: 'Forbidden (auth middleware)'
+    })
   })
 
   it('403s when ALLOWED_EMAILS is empty (fail closed)', async () => {

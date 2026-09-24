@@ -2,6 +2,7 @@ import { clerkClient } from '@clerk/nuxt/server'
 import { createError, defineEventHandler } from 'h3'
 import { parseAllowlist } from '../auth/allowlist'
 import { authorizeRequest } from '../auth/authorize'
+import { normalizeApiPath } from '../auth/normalize-path'
 import { resolvePrimaryVerifiedEmail } from '../auth/user-email'
 import { useUserEmailCache } from '../auth/user-email-cache'
 
@@ -19,10 +20,23 @@ const PUBLIC_API_PATHS = new Set(['/api/health'])
  *   `ALLOWED_EMAILS` allows nobody.
  * - Otherwise sets `event.context.userId` for handlers (see
  *   `requireUserId`).
+ *
+ * The path is matched via `normalizeApiPath` (percent-decoded, slashes
+ * collapsed, `.`/`..` resolved, lower-cased) rather than the raw
+ * `event.path`, so this check is never looser than what Nitro's router
+ * actually dispatches to — a naive `startsWith('/api/')` on the raw path
+ * can be bypassed with e.g. `/%61pi/me` (security review round 1, #5). A
+ * path that fails to decode is rejected outright (400) rather than
+ * silently skipped.
  */
 export default defineEventHandler(async (event) => {
-  // `event.path` may carry a query string; strip it for matching.
-  const path = event.path.split('?')[0] ?? event.path
+  const normalized = normalizeApiPath(event.path)
+
+  if (!normalized.ok) {
+    throw createError({ statusCode: 400, statusMessage: 'Bad Request' })
+  }
+
+  const path = normalized.path
 
   if (!path.startsWith('/api/') || PUBLIC_API_PATHS.has(path)) {
     return
@@ -31,7 +45,7 @@ export default defineEventHandler(async (event) => {
   const userId = event.context.auth?.()?.userId ?? null
 
   if (!userId) {
-    throw createError({ statusCode: 401, statusMessage: 'Unauthorized' })
+    throw createError({ statusCode: 401, statusMessage: 'Unauthorized (auth middleware)' })
   }
 
   const allowlist = parseAllowlist(process.env.ALLOWED_EMAILS)
@@ -53,7 +67,8 @@ export default defineEventHandler(async (event) => {
   if (!result.authorized) {
     throw createError({
       statusCode: result.status,
-      statusMessage: result.status === 401 ? 'Unauthorized' : 'Forbidden'
+      statusMessage:
+        result.status === 401 ? 'Unauthorized (auth middleware)' : 'Forbidden (auth middleware)'
     })
   }
 
