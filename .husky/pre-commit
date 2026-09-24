@@ -1,0 +1,17 @@
+#!/usr/bin/env sh
+
+if ! command -v gitleaks >/dev/null 2>&1; then
+  echo "error: gitleaks is not installed. Install it with: brew install gitleaks" >&2
+  exit 1
+fi
+
+# Run gitleaks before lint-staged so we fail fast on a leaked secret
+# rather than letting ESLint/Prettier rewrite the staged files first.
+gitleaks git --pre-commit --staged --redact --config .gitleaks.toml -v
+gitleaks_status=$?
+if [ $gitleaks_status -ne 0 ]; then
+  echo "error: gitleaks detected a potential secret in staged changes. Fix or unstage it before committing." >&2
+  exit $gitleaks_status
+fi
+
+pnpm exec lint-staged
