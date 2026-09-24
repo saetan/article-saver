@@ -2,7 +2,7 @@ import dns from 'node:dns'
 import http, { type Server } from 'node:http'
 import type { AddressInfo } from 'node:net'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { safeFetch } from './safe-fetch'
+import { safeFetch, validateUrl } from './safe-fetch'
 import {
   BlockedUrlError,
   InvalidUrlError,
@@ -41,27 +41,37 @@ describe('safeFetch', () => {
   })
 
   it('rejects URLs with embedded credentials', async () => {
-    await expect(safeFetch('http://user:pass@example.com/')).rejects.toBeInstanceOf(InvalidUrlError)
+    // https (not http) so this exercises the credentials check specifically,
+    // rather than being trivially rejected by the https-only check first.
+    await expect(safeFetch('https://user:pass@example.com/')).rejects.toBeInstanceOf(
+      InvalidUrlError
+    )
+  })
+
+  it('rejects plain http for a host not covered by the test override', async () => {
+    await expect(safeFetch('http://example.com/')).rejects.toBeInstanceOf(InvalidUrlError)
   })
 
   it('blocks a request to a loopback IP literal without the test override', async () => {
-    await expect(safeFetch('http://127.0.0.1:1/')).rejects.toBeInstanceOf(BlockedUrlError)
+    // https (not http) so this exercises the IP-blocking check specifically,
+    // rather than being trivially rejected by the https-only check first.
+    await expect(safeFetch('https://127.0.0.1:1/')).rejects.toBeInstanceOf(BlockedUrlError)
   })
 
   it('blocks a request to a numeric-hostname loopback address (decimal form)', async () => {
-    await expect(safeFetch('http://2130706433/')).rejects.toBeInstanceOf(BlockedUrlError)
+    await expect(safeFetch('https://2130706433/')).rejects.toBeInstanceOf(BlockedUrlError)
   })
 
   it('blocks a request to a numeric-hostname loopback address (hex/short form)', async () => {
-    await expect(safeFetch('http://0x7f.1/')).rejects.toBeInstanceOf(BlockedUrlError)
+    await expect(safeFetch('https://0x7f.1/')).rejects.toBeInstanceOf(BlockedUrlError)
   })
 
   it('blocks a request to an IPv6 loopback literal', async () => {
-    await expect(safeFetch('http://[::1]:1/')).rejects.toBeInstanceOf(BlockedUrlError)
+    await expect(safeFetch('https://[::1]:1/')).rejects.toBeInstanceOf(BlockedUrlError)
   })
 
   it('blocks an IPv4-mapped IPv6 loopback literal', async () => {
-    await expect(safeFetch('http://[::ffff:127.0.0.1]:1/')).rejects.toBeInstanceOf(BlockedUrlError)
+    await expect(safeFetch('https://[::ffff:127.0.0.1]:1/')).rejects.toBeInstanceOf(BlockedUrlError)
   })
 
   it('blocks a hostname (not an IP literal) whose DNS resolution is entirely non-public', async () => {
@@ -82,7 +92,7 @@ describe('safeFetch', () => {
       ])
     }) as typeof dns.lookup)
 
-    await expect(safeFetch('http://internal.article-saver.test/')).rejects.toBeInstanceOf(
+    await expect(safeFetch('https://internal.article-saver.test/')).rejects.toBeInstanceOf(
       BlockedUrlError
     )
   })
@@ -105,9 +115,12 @@ describe('safeFetch', () => {
     const { server, url } = await startServer((_req, res) => res.end('nope'))
     servers.push(server)
 
-    await expect(safeFetch(url + '/', { allowHosts: ['not-this-host'] })).rejects.toBeInstanceOf(
-      BlockedUrlError
-    )
+    // https (not http) so this exercises IP-range blocking specifically -
+    // the https-only check has its own dedicated coverage below.
+    const secureUrl = url.replace('http://', 'https://')
+    await expect(
+      safeFetch(secureUrl + '/', { allowHosts: ['not-this-host'] })
+    ).rejects.toBeInstanceOf(BlockedUrlError)
   })
 
   it('follows a chain of redirects and revalidates each hop', async () => {
@@ -195,7 +208,9 @@ describe('safeFetch', () => {
 
   it('blocks a redirect that points at a private IP not covered by allowHosts', async () => {
     const { server, url } = await startServer((_req, res) => {
-      res.writeHead(302, { location: 'http://10.0.0.5/internal' })
+      // https so this specifically exercises IP-range blocking on the
+      // redirect hop, not the (separately tested) https-only protocol check.
+      res.writeHead(302, { location: 'https://10.0.0.5/internal' })
       res.end()
     })
     servers.push(server)
@@ -206,6 +221,25 @@ describe('safeFetch', () => {
     const localUrl = url.replace('127.0.0.1', 'localhost')
     await expect(safeFetch(localUrl + '/', { allowHosts: ['localhost'] })).rejects.toBeInstanceOf(
       BlockedUrlError
+    )
+  })
+
+  it('rejects a redirect to plain http for a host not covered by the test override', async () => {
+    // The initial hop is over plain http too (our stub server can't speak
+    // real TLS), but permitted via allowHosts - standing in for "a hop that
+    // has already been validated". The redirect target is a different,
+    // non-allowlisted hostname over plain http: this proves the https-only
+    // check is re-applied independently on every hop rather than being
+    // "inherited" once the chain starts, which is exactly what stops an
+    // https -> http downgrade partway through a redirect chain.
+    const { server, url } = await startServer((_req, res) => {
+      res.writeHead(302, { location: 'http://not-allowlisted.article-saver.test/secure-only' })
+      res.end()
+    })
+    servers.push(server)
+
+    await expect(safeFetch(url + '/', { allowHosts: ['127.0.0.1'] })).rejects.toBeInstanceOf(
+      InvalidUrlError
     )
   })
 
@@ -298,5 +332,50 @@ describe('safeFetch', () => {
       headers: { 'Accept-Encoding': 'gzip' }
     })
     expect(receivedAcceptEncoding).toBe('gzip')
+  })
+})
+
+describe('validateUrl (https-only enforcement)', () => {
+  const originalNodeEnv = process.env.NODE_ENV
+
+  afterEach(() => {
+    process.env.NODE_ENV = originalNodeEnv
+  })
+
+  it('accepts an https URL', () => {
+    expect(() => validateUrl('https://example.com/', {})).not.toThrow()
+  })
+
+  it('rejects a plain http URL, with a message that says plain http is not supported', () => {
+    expect(() => validateUrl('http://example.com/', {})).toThrow(InvalidUrlError)
+    expect(() => validateUrl('http://example.com/', {})).toThrow(/http is not supported/i)
+  })
+
+  it('rejects what would be an https -> http downgrade on a redirect hop', () => {
+    // This is exactly what safeFetch does for every redirect hop: resolve
+    // the Location header against the current URL, then re-validate it.
+    // Re-validating an http Location the same way as any other input is
+    // what makes a downgrade mid-chain impossible - there's no separate
+    // "was the previous hop https" state to smuggle past.
+    const redirectTarget = new URL('http://internal.example/', new URL('https://example.com/'))
+    expect(() => validateUrl(redirectTarget.href, {})).toThrow(InvalidUrlError)
+  })
+
+  it('allows http only for a host in allowHosts, and only under NODE_ENV=test', () => {
+    expect(process.env.NODE_ENV).toBe('test')
+    expect(() => validateUrl('http://127.0.0.1/', { allowHosts: ['127.0.0.1'] })).not.toThrow()
+  })
+
+  it('never allows http via allowHosts outside NODE_ENV=test, even for an allowlisted host', () => {
+    process.env.NODE_ENV = 'production'
+    expect(() => validateUrl('http://127.0.0.1/', { allowHosts: ['127.0.0.1'] })).toThrow(
+      InvalidUrlError
+    )
+  })
+
+  it('still rejects http for a host absent from allowHosts, under NODE_ENV=test', () => {
+    expect(() => validateUrl('http://127.0.0.1/', { allowHosts: ['other-host'] })).toThrow(
+      InvalidUrlError
+    )
   })
 })

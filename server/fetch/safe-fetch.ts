@@ -1,5 +1,10 @@
 import { Agent, request as undiciRequest } from 'undici'
-import { assertHostAllowedIfLiteral, createSafeLookup, type HostPolicyOptions } from './host-policy'
+import {
+  assertHostAllowedIfLiteral,
+  createSafeLookup,
+  isTestOverrideHost,
+  type HostPolicyOptions
+} from './host-policy'
 import { InvalidUrlError, TimeoutError, TooLargeError, TooManyRedirectsError } from './errors'
 
 const DEFAULT_TIMEOUT_MS = 10_000
@@ -40,15 +45,26 @@ export interface SafeFetchResponse {
 }
 
 /**
- * Validates protocol and credentials. We deliberately do not restrict the
- * port: once the IP-range checks in `host-policy.ts` are enforced, the
- * meaningful SSRF exposure is *which host* a request can reach, not which
- * port on an already-blocked host - an attacker who can reach a private IP
- * at all can pick any port on it, and legitimate self-hosted article sites
- * sometimes run on non-standard ports. Restricting to 80/443 would add
- * friction without closing a real gap.
+ * Validates protocol and credentials.
+ *
+ * **https only** (owner decision, 2026-09-24): plain `http:` is rejected,
+ * including on every redirect hop, so there's no https -> http downgrade
+ * mid-chain. The one exception is the existing test-only override
+ * (`allowHosts` / `SAFE_FETCH_ALLOW_HOSTS`) - already gated on
+ * `NODE_ENV === 'test'` in `host-policy.ts` - which lets the loopback e2e
+ * stub server (necessarily plain http) through in tests only. It is
+ * impossible to enable in production: outside `NODE_ENV === 'test'`,
+ * {@link isTestOverrideHost} always returns `false`, so plain http is
+ * always rejected there regardless of `allowHosts`.
+ *
+ * We deliberately do not restrict the port: once the IP-range checks in
+ * `host-policy.ts` are enforced, the meaningful SSRF exposure is *which
+ * host* a request can reach, not which port on an already-blocked host -
+ * an attacker who can reach a private IP at all can pick any port on it,
+ * and legitimate self-hosted article sites sometimes run on non-standard
+ * ports. Restricting to 443 would add friction without closing a real gap.
  */
-function validateUrl(input: string): URL {
+export function validateUrl(input: string, opts: HostPolicyOptions): URL {
   let url: URL
   try {
     url = new URL(input)
@@ -56,9 +72,17 @@ function validateUrl(input: string): URL {
     throw new InvalidUrlError(`"${input}" is not a valid URL`)
   }
 
-  if (url.protocol !== 'http:' && url.protocol !== 'https:') {
+  if (url.protocol === 'http:') {
+    if (!isTestOverrideHost(url.hostname, opts)) {
+      throw new InvalidUrlError(
+        `Plain http is not supported ("${input}") - only https: is allowed. ` +
+          'Plain http can only be reached via an explicit allowHosts/SAFE_FETCH_ALLOW_HOSTS ' +
+          'entry, and only when NODE_ENV=test.'
+      )
+    }
+  } else if (url.protocol !== 'https:') {
     throw new InvalidUrlError(
-      `Unsupported protocol "${url.protocol}" on "${input}" - only http: and https: are allowed`
+      `Unsupported protocol "${url.protocol}" on "${input}" - only https: is allowed`
     )
   }
 
@@ -125,11 +149,12 @@ function stripCrossOriginUnsafeHeaders(headers: Record<string, string>): Record<
 }
 
 /**
- * Fetches `input` while guarding against SSRF: only `http:`/`https:`, no
- * embedded credentials, every hostname and IP literal (including every hop
- * of a redirect chain, and every address a hostname resolves to) is
- * validated against {@link isBlockedIp} at the moment of connecting - not
- * ahead of time - which closes the DNS-rebinding TOCTOU gap. See
+ * Fetches `input` while guarding against SSRF: **https only** (plain
+ * `http:` is rejected - see {@link validateUrl}), no embedded credentials,
+ * every hostname and IP literal (including every hop of a redirect chain,
+ * and every address a hostname resolves to) is validated against
+ * {@link isBlockedIp} at the moment of connecting - not ahead of time -
+ * which closes the DNS-rebinding TOCTOU gap. See
  * `server/fetch/host-policy.ts` for how the pinning works.
  *
  * Enforces a total timeout (default 10s) across all redirect hops, a max
@@ -177,7 +202,7 @@ export async function safeFetch(
   }
 
   try {
-    let currentUrl = validateUrl(input)
+    let currentUrl = validateUrl(input, opts)
     let method = opts.method ?? 'GET'
     let bodyPayload = opts.body
     let requestHeaders = opts.headers ?? {}
@@ -215,7 +240,7 @@ export async function safeFetch(
             throw new TooManyRedirectsError(`Exceeded ${maxRedirects} redirects fetching ${input}`)
           }
 
-          const nextUrl = validateUrl(new URL(location, currentUrl).href)
+          const nextUrl = validateUrl(new URL(location, currentUrl).href, opts)
 
           // 301/302 historically downgrade non-GET/HEAD redirects to GET, matching fetch()/curl behaviour.
           if (
