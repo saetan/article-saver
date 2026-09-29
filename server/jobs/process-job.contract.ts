@@ -180,5 +180,59 @@ export function runJobPipelineTests(setup: () => Promise<JobPipelineContext>) {
       expect(seen).toHaveLength(6)
       expect(new Set(seen).size).toBe(6)
     })
+
+    it('re-claims a running job whose lease expired, counting the attempt, but not a fresh one', async () => {
+      const ctx = await setup()
+      const { item, job } = await enqueue(ctx)
+      const extractor: Extractor = { extract: async () => ({ title: 'Done' }) }
+      const leaseMs = 60_000
+      // A worker claims it at T0 and "crashes" (never finishes).
+      expect(await ctx.jobs.claimNext(T0, leaseMs)).toMatchObject({ id: job.id, attempts: 1 })
+
+      const fresh = new Date(T0.getTime() + leaseMs - 1000)
+      expect(
+        await processNextJob({
+          ...ctx,
+          extractors: { article: extractor },
+          now: () => fresh,
+          leaseMs
+        })
+      ).toBe('idle')
+
+      const expired = new Date(T0.getTime() + leaseMs + 1000)
+      expect(
+        await processNextJob({
+          ...ctx,
+          extractors: { article: extractor },
+          now: () => expired,
+          leaseMs
+        })
+      ).toBe('succeeded')
+      expect(await ctx.jobs.findById('user-1', job.id)).toMatchObject({
+        status: 'succeeded',
+        attempts: 2
+      })
+      expect((await ctx.items.findById('user-1', item.id))?.extractionStatus).toBe('succeeded')
+    })
+
+    it('fails a job that keeps being abandoned once attempts are exhausted', async () => {
+      const ctx = await setup()
+      const { item, job } = await enqueue(ctx)
+      const leaseMs = 1000
+      let t = T0
+      for (let i = 0; i < 3; i++) {
+        expect(await ctx.jobs.claimNext(t, leaseMs)).not.toBeNull()
+        t = new Date(t.getTime() + leaseMs + 1)
+      }
+      const outcome = await processNextJob({
+        ...ctx,
+        extractors: { article: { extract: async () => ({}) } },
+        now: () => t,
+        leaseMs
+      })
+      expect(outcome).toBe('failed')
+      expect((await ctx.jobs.findById('user-1', job.id))?.status).toBe('failed')
+      expect((await ctx.items.findById('user-1', item.id))?.extractionStatus).toBe('failed')
+    })
   })
 }

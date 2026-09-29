@@ -11,6 +11,8 @@ export interface ProcessJobDeps {
   now?: () => Date
   maxAttempts?: number
   backoffMs?: (attempt: number) => number
+  /** Lease after which a `running` job counts as abandoned (default 5 minutes). Extractors must finish within it. */
+  leaseMs?: number
 }
 
 export type ProcessJobOutcome = 'idle' | 'succeeded' | 'retry_scheduled' | 'failed'
@@ -36,10 +38,14 @@ export async function processNextJob(deps: ProcessJobDeps): Promise<ProcessJobOu
   const maxAttempts = deps.maxAttempts ?? MAX_JOB_ATTEMPTS
   const backoff = deps.backoffMs ?? backoffDelayMs
 
-  const job = await deps.jobs.claimNext(now())
+  const job = await deps.jobs.claimNext(now(), deps.leaseMs)
   if (!job) return 'idle'
 
   try {
+    // A reclaimed (crashed) run counts as an attempt; don't run past the limit.
+    if (job.attempts > maxAttempts) {
+      throw new NonRetryableExtractionError('Extraction was interrupted too many times')
+    }
     if (job.type !== EXTRACT_JOB_TYPE) {
       throw new NonRetryableExtractionError(`Unknown job type "${job.type}"`)
     }

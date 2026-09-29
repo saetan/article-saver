@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it } from 'vitest'
 import type { H3Event } from 'h3'
 import csrfMiddleware from './02.csrf'
 
@@ -18,6 +18,31 @@ function fakeEvent(opts: {
 }
 
 describe('csrf middleware', () => {
+  afterEach(() => {
+    delete process.env.NUXT_PUBLIC_APP_ORIGIN
+  })
+
+  it('with NUXT_PUBLIC_APP_ORIGIN set, compares Origin to it and ignores forwarded headers', async () => {
+    process.env.NUXT_PUBLIC_APP_ORIGIN = 'https://app.example.com'
+    const spoofed = fakeEvent({
+      method: 'POST',
+      path: '/api/items',
+      headers: {
+        'x-forwarded-host': 'evil.example',
+        'x-forwarded-proto': 'https',
+        origin: 'https://evil.example'
+      }
+    })
+    await expect(csrfMiddleware(spoofed)).rejects.toMatchObject({ statusCode: 403 })
+
+    const ok = fakeEvent({
+      method: 'POST',
+      path: '/api/items',
+      headers: { host: 'internal:3000', origin: 'https://app.example.com' }
+    })
+    await expect(csrfMiddleware(ok)).resolves.toBeUndefined()
+  })
+
   it('403s a cross-origin POST to /api/**', async () => {
     const event = fakeEvent({
       method: 'POST',

@@ -12,6 +12,9 @@
  * - neither present (e.g. curl): refused. Non-browser clients must use the
  *   token path below.
  *
+ * The expected origin is `NUXT_PUBLIC_APP_ORIGIN` when set, else derived from
+ * the request (honouring `X-Forwarded-Host`/`-Proto`).
+ *
  * Extension point (M2, ADR 0005): requests authenticated by an API token are
  * not vulnerable to CSRF (the credential is not ambient) so they can bypass
  * this check. `isBearerTokenRequest` is where that branch lives; it returns
@@ -50,4 +53,19 @@ export function isSameOriginRequest(input: CsrfCheckInput): boolean {
 /** True when the request must pass {@link isSameOriginRequest} to proceed. */
 export function requiresCsrfCheck(method: string): boolean {
   return STATE_CHANGING_METHODS.has(method.toUpperCase())
+}
+
+/**
+ * The origin requests must come from: the explicitly configured
+ * `NUXT_PUBLIC_APP_ORIGIN` when set (independent of any proxy header), else
+ * the origin derived from the (forwarded) request URL.
+ */
+export function resolveExpectedOrigin(configured: string | undefined, derived: string): string {
+  const value = configured?.trim()
+  if (!value) return derived
+  try {
+    return new URL(value).origin
+  } catch {
+    throw new Error(`NUXT_PUBLIC_APP_ORIGIN is not a valid URL: "${value}"`)
+  }
 }

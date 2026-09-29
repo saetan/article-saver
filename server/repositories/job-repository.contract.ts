@@ -147,6 +147,22 @@ export function runJobRepositoryContractTests(setup: () => Promise<JobRepository
         expect(claimedIds).toHaveLength(created.length)
         expect(new Set(claimedIds).size).toBe(created.length)
       })
+
+      it('takes over a running job only after its lease expires, and only once under concurrency', async () => {
+        const { repo, itemId } = await setup()
+        const created = await repo.create('user-1', { itemId, type: 'extract' })
+        await repo.claimNext(now, 60_000)
+
+        expect(await repo.claimNext(new Date(now.getTime() + 59_000), 60_000)).toBeNull()
+
+        const later = new Date(now.getTime() + 61_000)
+        const results = await Promise.all(
+          Array.from({ length: 10 }, () => repo.claimNext(later, 60_000))
+        )
+        const claimed = results.filter((j) => j !== null)
+        expect(claimed).toHaveLength(1)
+        expect(claimed[0]).toMatchObject({ id: created.id, attempts: 2, status: 'running' })
+      })
     })
   })
 }

@@ -1,5 +1,10 @@
 import { createError, defineEventHandler, getRequestHeader, getRequestURL } from 'h3'
-import { isBearerTokenRequest, isSameOriginRequest, requiresCsrfCheck } from '../auth/csrf'
+import {
+  isBearerTokenRequest,
+  isSameOriginRequest,
+  requiresCsrfCheck,
+  resolveExpectedOrigin
+} from '../auth/csrf'
 import { normalizeApiPath } from '../auth/normalize-path'
 
 /**
@@ -11,7 +16,8 @@ import { normalizeApiPath } from '../auth/normalize-path'
  * Runs after `01.auth.ts` (filename order), so an unauthenticated request is
  * rejected 401 first. The path goes through the same `normalizeApiPath` as
  * the auth middleware so this check is never looser than what Nitro routes.
- * `X-Forwarded-Host`/`-Proto` are honoured so the check also works behind
+ * `NUXT_PUBLIC_APP_ORIGIN`, when set, is the expected origin (no reliance on
+ * proxy headers); otherwise `X-Forwarded-Host`/`-Proto` are honoured so the check also works behind
  * the Replit proxy; a cross-site page cannot set those headers (they are not
  * CORS-safelisted, so the browser would preflight and be refused).
  */
@@ -26,7 +32,10 @@ export default defineEventHandler(async (event) => {
   // M2: API-token requests skip the same-origin check (not ambient credentials).
   if (isBearerTokenRequest(getRequestHeader(event, 'authorization'))) return
 
-  const requestOrigin = getRequestURL(event, { xForwardedHost: true, xForwardedProto: true }).origin
+  const requestOrigin = resolveExpectedOrigin(
+    process.env.NUXT_PUBLIC_APP_ORIGIN,
+    getRequestURL(event, { xForwardedHost: true, xForwardedProto: true }).origin
+  )
 
   const allowed = isSameOriginRequest({
     method: event.method,

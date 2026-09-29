@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest'
-import { isBearerTokenRequest, isSameOriginRequest, requiresCsrfCheck } from './csrf'
+import {
+  isBearerTokenRequest,
+  isSameOriginRequest,
+  requiresCsrfCheck,
+  resolveExpectedOrigin
+} from './csrf'
 
 const own = 'https://app.example.com'
 
@@ -49,5 +54,20 @@ describe('isBearerTokenRequest (M2 extension point)', () => {
   it('is not implemented yet: never exempts a request', () => {
     expect(isBearerTokenRequest('Bearer abc')).toBe(false)
     expect(isBearerTokenRequest(undefined)).toBe(false)
+  })
+})
+
+describe('resolveExpectedOrigin', () => {
+  it('prefers the configured origin, normalised', () => {
+    expect(resolveExpectedOrigin('https://app.example.com/', 'http://internal:3000')).toBe(
+      'https://app.example.com'
+    )
+  })
+  it('falls back to the derived origin when unset or blank', () => {
+    expect(resolveExpectedOrigin(undefined, 'http://internal:3000')).toBe('http://internal:3000')
+    expect(resolveExpectedOrigin('  ', 'http://internal:3000')).toBe('http://internal:3000')
+  })
+  it('throws on an invalid configured value', () => {
+    expect(() => resolveExpectedOrigin('not a url', 'http://x')).toThrow()
   })
 })

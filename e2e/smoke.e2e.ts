@@ -13,13 +13,15 @@ test('signed out: / redirects to /sign-in', async ({ page }) => {
   await expect(page).toHaveURL(/\/sign-in/)
 })
 
-test('signed in (allowlisted): empty Library and /api/me returns 200', async ({ page }) => {
+test('signed in (allowlisted): Library loads and /api/me returns 200', async ({ page }) => {
   await setupClerkTestingToken({ page })
   await page.goto('/sign-in')
   await clerk.signIn({ page, emailAddress: process.env.E2E_CLERK_USER_EMAIL! })
   await page.goto('/')
 
-  await expect(page.getByText('Your library is empty')).toBeVisible()
+  // Not asserting an empty Library: other e2e files share the database.
+  await expect(page.getByRole('heading', { name: 'Library' })).toBeVisible()
+  await expect(page.getByPlaceholder('https://example.com/article')).toBeVisible()
 
   const me = await page.request.get('/api/me')
   expect(me.status()).toBe(200)

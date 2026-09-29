@@ -1,7 +1,7 @@
-import { and, asc, eq, inArray, isNull, lte, or, sql } from 'drizzle-orm'
+import { and, asc, eq, inArray, isNull, lt, lte, or, sql } from 'drizzle-orm'
 import type { PostgresDbContext } from '../db/client'
 import { generateId } from '../db/id'
-import type { JobRepository } from './types'
+import { DEFAULT_JOB_LEASE_MS, type JobRepository } from './types'
 
 export function createPostgresJobRepository(ctx: PostgresDbContext): JobRepository {
   const { db, schema } = ctx
@@ -45,21 +45,26 @@ export function createPostgresJobRepository(ctx: PostgresDbContext): JobReposito
         .where(and(eq(jobs.userId, userId), eq(jobs.status, 'pending')))
     },
 
-    async claimNext(now) {
+    async claimNext(now, leaseMs = DEFAULT_JOB_LEASE_MS) {
       // Postgres: the inner SELECT locks its candidate row with FOR UPDATE SKIP LOCKED, so
       // concurrent workers each lock a different pending row (or none); the outer
-      // `status = 'pending'` re-check guards the READ COMMITTED re-evaluation.
+      // `runnable` re-check guards the READ COMMITTED re-evaluation.
+      const runnable = or(
+        and(eq(jobs.status, 'pending'), or(isNull(jobs.runAt), lte(jobs.runAt, now))),
+        // Expired lease: a worker died mid-run (crash, redeploy); take it over.
+        and(eq(jobs.status, 'running'), lt(jobs.updatedAt, new Date(now.getTime() - leaseMs)))
+      )
       const candidate = db
         .select({ id: jobs.id })
         .from(jobs)
-        .where(and(eq(jobs.status, 'pending'), or(isNull(jobs.runAt), lte(jobs.runAt, now))))
+        .where(runnable)
         .orderBy(asc(jobs.createdAt), asc(jobs.id))
         .limit(1)
         .for('update', { skipLocked: true })
       const [claimed] = await db
         .update(jobs)
         .set({ status: 'running', attempts: sql`${jobs.attempts} + 1`, updatedAt: now })
-        .where(and(eq(jobs.status, 'pending'), inArray(jobs.id, candidate)))
+        .where(and(runnable, inArray(jobs.id, candidate)))
         .returning()
       return claimed ?? null
     },
