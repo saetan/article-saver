@@ -135,7 +135,7 @@ The hooks are installed automatically by `pnpm install` (via the `prepare` scrip
 
 1. **Static checks**: lint, Prettier check, typecheck, unit tests, build, and a gitleaks scan of the full history.
 2. **Integration (sqlite)** and **Integration (postgres)**: run in parallel once static passes (Postgres via Testcontainers).
-3. **End-to-end**: Playwright (Chromium) against Clerk. It does nothing, with a notice, when `playwright.config.ts` doesn't exist yet or when the Clerk secrets are unavailable (for example on fork PRs).
+3. **End-to-end**: Playwright (Chromium) against Clerk. It fails if the Clerk secrets below are missing, except on fork PRs (which can't receive secrets), where it is skipped with a notice.
 
 The repository owner must add these under GitHub → Settings → Secrets and variables → Actions for the e2e stage:
 
