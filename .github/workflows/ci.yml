@@ -148,13 +148,17 @@ jobs:
         if: steps.gate.outputs.run == 'true'
         run: pnpm test:e2e
 
+      - name: Write e2e job summary
+        if: always() && steps.gate.outputs.run == 'true'
+        run: node scripts/e2e-summary.mjs test-results/e2e-results.json "playwright-report-${{ github.run_id }}-${{ github.run_attempt }}" >> "$GITHUB_STEP_SUMMARY"
+
       - name: Upload Playwright report
-        if: failure() && steps.gate.outputs.run == 'true'
+        if: always() && steps.gate.outputs.run == 'true'
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: playwright-report
+          name: playwright-report-${{ github.run_id }}-${{ github.run_attempt }}
           path: |
             playwright-report/
             test-results/
-          if-no-files-found: ignore
+          if-no-files-found: warn
           retention-days: 14

@@ -100,6 +100,15 @@ The `CLERK_*` mapping happens inside `e2e/env.ts`, not in `.env`.
 
 **GitHub Actions secrets the CI e2e job (#8) needs:** `NUXT_PUBLIC_CLERK_PUBLISHABLE_KEY`, `NUXT_CLERK_SECRET_KEY`, `E2E_CLERK_USER_EMAIL`.
 
+#### Reading e2e results in CI
+
+Every CI run (pass or fail) publishes the e2e evidence, with no extra permissions and no PR comment bot:
+
+- **Summary:** PR → Checks → the CI run → **Summary**. The "End-to-end results" table lists each test's status and duration plus totals (written by `scripts/e2e-summary.mjs` from Playwright's JSON reporter).
+- **Report and screenshots:** the same page's **Artifacts** section holds `playwright-report-<run_id>-<attempt>` (HTML report, traces, and a screenshot per test under `test-results/`), kept 14 days. Download and unzip it, then `pnpm exec playwright show-report <dir>/playwright-report`.
+
+Screenshots are `on` in CI and `only-on-failure` locally. They only show app UI with test data; secrets are never rendered.
+
 #### Podman (local container engine)
 
 The container engine locally is **Podman**, with a running `podman machine`. `pnpm test:integration:postgres` runs through `scripts/testcontainers-env.mjs`, which — if `DOCKER_HOST` isn't already set — resolves it from `podman machine inspect --format '{{.ConnectionInfo.PodmanSocket.Path}}'` and sets `TESTCONTAINERS_RYUK_DISABLED=true` (Ryuk, Testcontainers' usual cleanup sidecar, doesn't run reliably under Podman). No manual env setup is needed; just make sure your Podman machine is running (`podman machine start`). The started container is stopped explicitly in Vitest's `globalTeardown` since Ryuk is disabled.

@@ -1,0 +1,30 @@
+{
+  "suites": [
+    {
+      "title": "smoke.e2e.ts",
+      "file": "smoke.e2e.ts",
+      "specs": [
+        {
+          "title": "GET /api/health returns 200",
+          "tests": [{ "status": "expected", "results": [{ "duration": 120 }] }]
+        },
+        {
+          "title": "flaky | piped",
+          "tests": [{ "status": "flaky", "results": [{ "duration": 1000 }, { "duration": 500 }] }]
+        }
+      ],
+      "suites": [
+        {
+          "title": "library",
+          "specs": [
+            {
+              "title": "shows empty state",
+              "tests": [{ "status": "unexpected", "results": [{ "duration": 2500 }] }]
+            },
+            { "title": "todo", "tests": [{ "status": "skipped", "results": [] }] }
+          ]
+        }
+      ]
+    }
+  ]
+}
