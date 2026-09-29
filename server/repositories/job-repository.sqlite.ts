@@ -1,4 +1,4 @@
-import { and, eq } from 'drizzle-orm'
+import { and, asc, eq, inArray, isNull, lte, or, sql } from 'drizzle-orm'
 import type { SqliteDbContext } from '../db/client'
 import { generateId } from '../db/id'
 import type { JobRepository } from './types'
@@ -43,6 +43,23 @@ export function createSqliteJobRepository(ctx: SqliteDbContext): JobRepository {
         .select()
         .from(jobs)
         .where(and(eq(jobs.userId, userId), eq(jobs.status, 'pending')))
+    },
+
+    async claimNext(now) {
+      // SQLite: a single UPDATE ... RETURNING statement is atomic (one writer at a time), so two
+      // workers can never both flip the same row from pending to running.
+      const candidate = db
+        .select({ id: jobs.id })
+        .from(jobs)
+        .where(and(eq(jobs.status, 'pending'), or(isNull(jobs.runAt), lte(jobs.runAt, now))))
+        .orderBy(asc(jobs.createdAt), asc(jobs.id))
+        .limit(1)
+      const [claimed] = await db
+        .update(jobs)
+        .set({ status: 'running', attempts: sql`${jobs.attempts} + 1`, updatedAt: now })
+        .where(and(eq(jobs.status, 'pending'), inArray(jobs.id, candidate)))
+        .returning()
+      return claimed ?? null
     },
 
     async update(userId, id, input) {

@@ -29,6 +29,8 @@ export interface ItemListFilter {
   type?: Item['type']
   status?: Item['status']
   isFavorite?: boolean
+  /** Maximum rows to return. Results are always newest first (`created_at` desc). */
+  limit?: number
 }
 
 /**
@@ -55,6 +57,20 @@ export interface JobRepository {
   create(userId: string, input: NewJob): Promise<Job>
   findById(userId: string, id: string): Promise<Job | null>
   listPending(userId: string): Promise<Job[]>
+  /**
+   * Atomically claims the oldest runnable job (`status = 'pending'` and
+   * `run_at` null or <= `now`): flips it to `running`, increments
+   * `attempts`, and returns it, or returns `null` when nothing is runnable.
+   * Safe under concurrent workers on both dialects (Postgres `FOR UPDATE
+   * SKIP LOCKED`; SQLite's single writer): no two callers ever receive the
+   * same job.
+   *
+   * Deliberately NOT user-scoped: the background worker serves every user
+   * (ADR 0002 scopes request handlers, not the system worker). The returned
+   * job carries `userId`; everything the worker does next goes through the
+   * user-scoped methods with that id.
+   */
+  claimNext(now: Date): Promise<Job | null>
   update(userId: string, id: string, input: JobUpdate): Promise<Job | null>
   delete(userId: string, id: string): Promise<boolean>
 }

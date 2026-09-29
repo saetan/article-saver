@@ -37,7 +37,8 @@
     "postgres": "^3.4.9",
     "tailwindcss": "^4.3.3",
     "undici": "^8.11.0",
-    "uuid": "^14.0.2"
+    "uuid": "^14.0.2",
+    "zod": "^4.6.5"
   },
   "devDependencies": {
     "@nuxt/eslint": "^1.17.0",
