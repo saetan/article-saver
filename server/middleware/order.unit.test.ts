@@ -38,6 +38,14 @@ describe('server middleware registration order (security review round 2, #5)', (
     expect(files.indexOf('00.clerk.ts')).toBeLessThan(files.indexOf('01.auth.ts'))
   })
 
+  it('02.csrf.ts sorts after 01.auth.ts (unauthenticated requests get 401 before the CSRF check)', () => {
+    const files = readdirSync(MIDDLEWARE_DIR)
+      .filter((entry) => entry.endsWith('.ts') && !entry.endsWith('.unit.test.ts'))
+      .sort()
+
+    expect(files.indexOf('02.csrf.ts')).toBeGreaterThan(files.indexOf('01.auth.ts'))
+  })
+
   it('00.clerk.ts actually registers clerkMiddleware()', () => {
     const source = readFileSync(join(MIDDLEWARE_DIR, '00.clerk.ts'), 'utf-8')
     expect(source).toMatch(/clerkMiddleware\s*\(/)

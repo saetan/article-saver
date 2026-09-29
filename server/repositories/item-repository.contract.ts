@@ -93,6 +93,18 @@ export function runItemRepositoryContractTests(
       expect(items).toHaveLength(2)
     })
 
+    it('lists newest first and honours limit', async () => {
+      const { repo } = await setup()
+      const a = await repo.create('user-1', baseItem({ canonicalUrl: 'example.com/a' }))
+      await new Promise((resolve) => setTimeout(resolve, 5))
+      const b = await repo.create('user-1', baseItem({ canonicalUrl: 'example.com/b' }))
+      await new Promise((resolve) => setTimeout(resolve, 5))
+      const c = await repo.create('user-1', baseItem({ canonicalUrl: 'example.com/c' }))
+
+      expect((await repo.list('user-1')).map((i) => i.id)).toEqual([c.id, b.id, a.id])
+      expect((await repo.list('user-1', { limit: 2 })).map((i) => i.id)).toEqual([c.id, b.id])
+    })
+
     it('filters listed items', async () => {
       const { repo } = await setup()
       await repo.create('user-1', baseItem({ canonicalUrl: 'example.com/a', status: 'unread' }))

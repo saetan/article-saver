@@ -91,5 +91,78 @@ export function runJobRepositoryContractTests(setup: () => Promise<JobRepository
       expect(updated).toBeNull()
       expect(stillPending?.status).toBe('pending')
     })
+
+    describe('claimNext', () => {
+      const now = new Date('2026-01-01T12:00:00Z')
+
+      it('claims a runnable job: running, attempts incremented', async () => {
+        const { repo, itemId } = await setup()
+        const created = await repo.create('user-1', { itemId, type: 'extract' })
+
+        const claimed = await repo.claimNext(now)
+
+        expect(claimed?.id).toBe(created.id)
+        expect(claimed?.status).toBe('running')
+        expect(claimed?.attempts).toBe(1)
+        expect(claimed?.userId).toBe('user-1')
+      })
+
+      it('returns null when nothing is runnable, and does not re-claim a running job', async () => {
+        const { repo, itemId } = await setup()
+        expect(await repo.claimNext(now)).toBeNull()
+        await repo.create('user-1', { itemId, type: 'extract' })
+        expect(await repo.claimNext(now)).not.toBeNull()
+        expect(await repo.claimNext(now)).toBeNull()
+      })
+
+      it('honours run_at: a future job is not claimed until it is due', async () => {
+        const { repo, itemId } = await setup()
+        const later = new Date(now.getTime() + 60_000)
+        const created = await repo.create('user-1', { itemId, type: 'extract', runAt: later })
+
+        expect(await repo.claimNext(now)).toBeNull()
+        expect((await repo.claimNext(later))?.id).toBe(created.id)
+      })
+
+      it('claims jobs across users, oldest first', async () => {
+        const { repo, itemId } = await setup()
+        const first = await repo.create('user-1', { itemId, type: 'extract' })
+        await new Promise((resolve) => setTimeout(resolve, 5))
+        const second = await repo.create('user-2', { itemId, type: 'extract' })
+
+        expect((await repo.claimNext(now))?.id).toBe(first.id)
+        expect((await repo.claimNext(now))?.id).toBe(second.id)
+      })
+
+      it('never hands the same job to two concurrent claimers', async () => {
+        const { repo, itemId } = await setup()
+        const created = await Promise.all(
+          Array.from({ length: 8 }, () => repo.create('user-1', { itemId, type: 'extract' }))
+        )
+
+        // 20 concurrent claimers race for 8 jobs.
+        const results = await Promise.all(Array.from({ length: 20 }, () => repo.claimNext(now)))
+        const claimedIds = results.filter((j) => j !== null).map((j) => j.id)
+
+        expect(claimedIds).toHaveLength(created.length)
+        expect(new Set(claimedIds).size).toBe(created.length)
+      })
+
+      it('takes over a running job only after its lease expires, and only once under concurrency', async () => {
+        const { repo, itemId } = await setup()
+        const created = await repo.create('user-1', { itemId, type: 'extract' })
+        await repo.claimNext(now, 60_000)
+
+        expect(await repo.claimNext(new Date(now.getTime() + 59_000), 60_000)).toBeNull()
+
+        const later = new Date(now.getTime() + 61_000)
+        const results = await Promise.all(
+          Array.from({ length: 10 }, () => repo.claimNext(later, 60_000))
+        )
+        const claimed = results.filter((j) => j !== null)
+        expect(claimed).toHaveLength(1)
+        expect(claimed[0]).toMatchObject({ id: created.id, attempts: 2, status: 'running' })
+      })
+    })
   })
 }

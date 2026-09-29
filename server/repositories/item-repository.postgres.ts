@@ -1,4 +1,4 @@
-import { and, eq } from 'drizzle-orm'
+import { and, desc, eq } from 'drizzle-orm'
 import type { PostgresDbContext } from '../db/client'
 import type { ItemUpdate, NewItem } from '../db/schema/types'
 import { DuplicateCanonicalUrlError, type ItemListFilter, type ItemRepository } from './types'
@@ -47,10 +47,13 @@ export function createPostgresItemRepository(ctx: PostgresDbContext): ItemReposi
       if (filter?.status) conditions.push(eq(items.status, filter.status))
       if (filter?.isFavorite !== undefined) conditions.push(eq(items.isFavorite, filter.isFavorite))
 
-      return db
+      const query = db
         .select()
         .from(items)
         .where(and(...conditions))
+        // Newest first; `id` is a tiebreaker so the order is stable within one millisecond.
+        .orderBy(desc(items.createdAt), desc(items.id))
+      return filter?.limit !== undefined ? query.limit(filter.limit) : query
     },
 
     async update(userId, id, input: ItemUpdate) {

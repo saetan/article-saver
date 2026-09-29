@@ -58,6 +58,13 @@ The app is a Nuxt 4 SPA (`ssr: false`, `app/` directory layout) with a Nitro API
 
 Postgres for local development and integration tests runs in a container (Docker or Podman — see [ADR 0012](docs/decisions/0012-testing-and-ci-strategy.md)).
 
+### Saving URLs, the job queue and CSRF
+
+- `POST /api/items` `{ url }` saves a URL: it is canonicalised (ADR 0013), the Item type is detected from the host (`x.com` -> `x_post`, `threads.net` -> `threads_post`, `instagram.com` -> `instagram_post`, otherwise `article`), the Item is created with `extraction_status=pending` and an `extract` job is queued. Responses: `201` Item, `400` invalid or non-http(s) URL, `409 { existingItemId, savedAt }` duplicate. Only `url` is read from the body (zod); the user id always comes from the session.
+- `GET /api/items` (newest 50) and `GET /api/items/:id` are user-scoped; another user's item is `404`.
+- **Jobs** (ADR 0008): a Nitro plugin (`server/plugins/jobs-worker.ts`) polls the `jobs` table. Claiming is atomic on both dialects (`JobRepository.claimNext`: Postgres `FOR UPDATE SKIP LOCKED`, SQLite single writer). A failed job is retried with exponential backoff (30s, 60s) up to 3 attempts, then the Item becomes `extraction_status=failed` with `extraction_error`. A job left `running` (crash, redeploy) is re-claimed after a 5 minute lease (counted as an attempt), so extractors must finish within it. Extractors are looked up by Item type in `server/jobs/extractor.ts`; a type without one fails immediately with "Extraction not available yet" (real extractors: #13, #16, #17). `JOBS_WORKER=off` disables the worker (tests); `JOBS_POLL_MS` sets the idle poll interval (default 2000).
+- **CSRF** (`server/middleware/02.csrf.ts`): POST/PUT/PATCH/DELETE to `/api/**` must be same-origin: the `Origin` header must equal the request's own origin, or, when `Origin` is absent, `Sec-Fetch-Site` must be `same-origin`; otherwise `403`. The expected origin is `NUXT_PUBLIC_APP_ORIGIN` when set, otherwise derived from `X-Forwarded-Host`/`-Proto`. M2 API-token (Bearer) requests will bypass this via `isBearerTokenRequest` in `server/auth/csrf.ts` (a stub that returns false today). Non-browser clients therefore cannot call these endpoints until tokens exist.
+
 ### Testing (ADR 0012)
 
 Two Vitest projects:
