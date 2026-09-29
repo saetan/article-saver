@@ -14,3 +14,5 @@ coverage
 docs/
 .github/ISSUE_TEMPLATE/
 LICENSE
+test-results
+playwright-report

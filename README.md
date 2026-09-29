@@ -49,6 +49,7 @@ pnpm test:unit                 # vitest "unit" project only (no containers)
 pnpm test:integration          # vitest "integration" project, sqlite then postgres
 pnpm test:integration:sqlite   # integration project against file-based SQLite
 pnpm test:integration:postgres # integration project against Postgres (Testcontainers)
+pnpm test:e2e                  # Playwright e2e against the built app (see "E2E tests")
 pnpm db:generate    # generate a migration for DB_DIALECT (sqlite | postgres)
 pnpm db:migrate     # apply pending migrations for DB_DIALECT
 ```
@@ -75,6 +76,29 @@ Two Vitest projects:
   - `pnpm test:integration` runs both, sqlite then postgres.
 
 `pnpm test` runs `test:unit` then `test:integration`.
+
+#### E2E tests
+
+`pnpm test:e2e` runs [Playwright](https://playwright.dev) (Chromium only) against the **built** app. One-time browser install: `pnpm exec playwright install chromium`.
+
+What `playwright.config.ts` starts (its `webServer`):
+
+- **Stub HTTP server** (`e2e/stub-server`, port 4010) serving fixtures — an article page, an Open Graph-only page and an X oEmbed JSON mock — so tests never touch the real internet.
+- **The app**: `pnpm build`, then `.output/server/index.mjs` on port 3100 with `NODE_ENV=test`, a throwaway file-based SQLite db (migrated, in a temp dir), local blob storage in that temp dir, `ALLOWED_EMAILS` set to the e2e user, and `SAFE_FETCH_ALLOW_HOSTS=localhost,127.0.0.1` (only honoured under `NODE_ENV=test`) so `safeFetch` may reach the stub.
+
+Sign-in uses [`@clerk/testing`](https://clerk.com/docs/testing/playwright/overview): `clerkSetup()` in the global setup, `setupClerkTestingToken` per page and `clerk.signIn({ page, emailAddress })`, which signs in by sign-in token minted with the secret key (no password). The user must **already exist in your Clerk _development_ instance**; tests never create or delete users.
+
+Required env (from `.env` locally, or CI secrets; **development-instance values only**):
+
+| Variable                            | Purpose                                                                                  |
+| ----------------------------------- | ---------------------------------------------------------------------------------------- |
+| `NUXT_PUBLIC_CLERK_PUBLISHABLE_KEY` | Clerk dev publishable key (also mapped to `CLERK_PUBLISHABLE_KEY` for `@clerk/testing`)  |
+| `NUXT_CLERK_SECRET_KEY`             | Clerk dev secret key (also mapped to `CLERK_SECRET_KEY` for `@clerk/testing`)            |
+| `E2E_CLERK_USER_EMAIL`              | Email of the existing, allowlisted test user; defaults to the first `ALLOWED_EMAILS` entry |
+
+The `CLERK_*` mapping happens inside `e2e/env.ts`, not in `.env`.
+
+**GitHub Actions secrets the CI e2e job (#8) needs:** `NUXT_PUBLIC_CLERK_PUBLISHABLE_KEY`, `NUXT_CLERK_SECRET_KEY`, `E2E_CLERK_USER_EMAIL`.
 
 #### Podman (local container engine)
 
@@ -110,7 +134,7 @@ Drizzle schemas, migrations and repositories live under `server/db/` and `server
 
 Sign-in is via [Clerk](https://clerk.com) (`@clerk/nuxt`), restricted to the emails listed in `ALLOWED_EMAILS` (comma-separated, case-insensitive). Set `NUXT_PUBLIC_CLERK_PUBLISHABLE_KEY`, `NUXT_CLERK_SECRET_KEY` and `ALLOWED_EMAILS` in `.env` (get the Clerk keys from your [Clerk dashboard](https://dashboard.clerk.com)).
 
-- Every `/api/**` route except `GET /api/health` requires a Clerk session (`401` if missing) **and** a verified primary email in `ALLOWED_EMAILS` (`403` otherwise) — this is enforced server-side in `server/middleware/auth.ts`, never trusting anything client-supplied. An empty or missing `ALLOWED_EMAILS` allows nobody (fails closed).
+- Every `/api/**` route except `GET /api/health` requires a Clerk session (`401` if missing) **and** a verified primary email in `ALLOWED_EMAILS` (`403` otherwise) — this is enforced server-side by `server/middleware/00.clerk.ts` (installs Clerk's session middleware) followed by `server/middleware/01.auth.ts` (the allowlist check); the numeric prefixes fix their order, see `order.unit.test.ts`. Nothing client-supplied is ever trusted. Never trusting anything client-supplied. An empty or missing `ALLOWED_EMAILS` allows nobody (fails closed).
 - API handlers read the current user via `requireUserId(event)` (`server/auth/require-user-id.ts`), which throws `401` if it's somehow missing, and always pass that id into the repository layer.
 - The SPA client-side route guard (`app/middleware/auth.global.ts`) is defence in depth for UX (redirects to `/sign-in` or `/not-allowed`); it is not what makes data private.
 

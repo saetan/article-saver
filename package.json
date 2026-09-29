@@ -17,6 +17,7 @@
     "test:unit": "vitest run --project unit",
     "test:integration:sqlite": "TEST_DIALECT=sqlite vitest run --project integration",
     "test:integration:postgres": "TEST_DIALECT=postgres node scripts/testcontainers-env.mjs vitest run --project integration",
+    "test:e2e": "playwright test",
     "test:integration": "pnpm test:integration:sqlite && pnpm test:integration:postgres",
     "test": "pnpm test:unit && pnpm test:integration",
     "db:generate": "node scripts/db.mjs generate",
@@ -41,7 +42,9 @@
     "zod": "^4.6.5"
   },
   "devDependencies": {
+    "@clerk/testing": "^2.2.39",
     "@nuxt/eslint": "^1.17.0",
+    "@playwright/test": "^1.63.0",
     "@testcontainers/postgresql": "^12.1.0",
     "@types/node": "^24.13.6",
     "drizzle-kit": "^0.31.11",
