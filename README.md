@@ -151,7 +151,21 @@ Install gitleaks once per machine:
 brew install gitleaks
 ```
 
-The hooks are installed automatically by `pnpm install` (via the `prepare` script). gitleaks is planned to also run in CI (see ADR 0012, tracked in #8) — until that CI job exists, `git commit --no-verify` bypasses the check entirely, so don't use it.
+The hooks are installed automatically by `pnpm install` (via the `prepare` script). The same gitleaks scan also runs in CI over the full git history (see [CI](#ci)), but `git commit --no-verify` still bypasses the local check, so don't use it.
+
+## CI
+
+[`.github/workflows/ci.yml`](.github/workflows/ci.yml) runs on every pull request and on pushes to `main`, in stages (ADR 0012):
+
+1. **Static checks**: lint, Prettier check, typecheck, unit tests, build, and a gitleaks scan of the full history.
+2. **Integration (sqlite)** and **Integration (postgres)**: run in parallel once static passes (Postgres via Testcontainers).
+3. **End-to-end**: Playwright (Chromium) against Clerk. It fails if the Clerk secrets below are missing, except on fork PRs (which can't receive secrets), where it is skipped with a notice.
+
+The repository owner must add these under GitHub → Settings → Secrets and variables → Actions for the e2e stage:
+
+- `NUXT_PUBLIC_CLERK_PUBLISHABLE_KEY`
+- `NUXT_CLERK_SECRET_KEY`
+- `E2E_CLERK_USER_EMAIL`
 
 ## License
 
