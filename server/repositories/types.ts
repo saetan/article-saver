@@ -29,6 +29,8 @@ export interface ItemListFilter {
   type?: Item['type']
   status?: Item['status']
   isFavorite?: boolean
+  /** Maximum rows to return. Results are always newest first (`created_at` desc). */
+  limit?: number
 }
 
 /**
@@ -51,10 +53,28 @@ export interface TagRepository {
   delete(userId: string, id: string): Promise<boolean>
 }
 
+/** How long a `running` job may go without an `updated_at` refresh before another worker may take it over. */
+export const DEFAULT_JOB_LEASE_MS = 5 * 60_000
+
 export interface JobRepository {
   create(userId: string, input: NewJob): Promise<Job>
   findById(userId: string, id: string): Promise<Job | null>
   listPending(userId: string): Promise<Job[]>
+  /**
+   * Atomically claims the oldest runnable job (`status = 'pending'` and
+   * `run_at` null or <= `now`, or `status = 'running'` with `updated_at`
+   * older than `leaseMs`: a worker that died mid-run): flips it to `running`, increments
+   * `attempts`, and returns it, or returns `null` when nothing is runnable.
+   * Safe under concurrent workers on both dialects (Postgres `FOR UPDATE
+   * SKIP LOCKED`; SQLite's single writer): no two callers ever receive the
+   * same job.
+   *
+   * Deliberately NOT user-scoped: the background worker serves every user
+   * (ADR 0002 scopes request handlers, not the system worker). The returned
+   * job carries `userId`; everything the worker does next goes through the
+   * user-scoped methods with that id.
+   */
+  claimNext(now: Date, leaseMs?: number): Promise<Job | null>
   update(userId: string, id: string, input: JobUpdate): Promise<Job | null>
   delete(userId: string, id: string): Promise<boolean>
 }
