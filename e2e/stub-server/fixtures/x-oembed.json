@@ -1,0 +1,13 @@
+{
+  "url": "https://x.com/stubuser/status/1234567890",
+  "author_name": "Stub User",
+  "author_url": "https://x.com/stubuser",
+  "html": "<blockquote class=\"twitter-tweet\"><p lang=\"en\" dir=\"ltr\">Hello from the stub oEmbed mock</p>&mdash; Stub User (@stubuser) <a href=\"https://x.com/stubuser/status/1234567890\">September 1, 2026</a></blockquote>",
+  "width": 550,
+  "height": null,
+  "type": "rich",
+  "cache_age": "3153600000",
+  "provider_name": "X",
+  "provider_url": "https://x.com",
+  "version": "1.0"
+}
