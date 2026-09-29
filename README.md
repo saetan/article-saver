@@ -99,6 +99,14 @@ Drizzle schemas, migrations and repositories live under `server/db/` and `server
 - `pnpm db:generate` writes a new migration to `server/db/migrations/<dialect>/` from the schema in `server/db/schema/<dialect>.ts`. Schema changes are made in **both** dialect files and a migration generated for each.
 - **Migrations are a deploy step, not automatic on server start.** Run `pnpm db:migrate` (with `DB_DIALECT=postgres` and `DATABASE_URL` set) before starting the server on every deploy. For local SQLite dev, run it once after `pnpm install` (or whenever the schema changes) — `SQLITE_PATH` defaults to `./.data/article-saver.sqlite`.
 
+### Authentication (ADR 0002, 0005)
+
+Sign-in is via [Clerk](https://clerk.com) (`@clerk/nuxt`), restricted to the emails listed in `ALLOWED_EMAILS` (comma-separated, case-insensitive). Set `NUXT_PUBLIC_CLERK_PUBLISHABLE_KEY`, `NUXT_CLERK_SECRET_KEY` and `ALLOWED_EMAILS` in `.env` (get the Clerk keys from your [Clerk dashboard](https://dashboard.clerk.com)).
+
+- Every `/api/**` route except `GET /api/health` requires a Clerk session (`401` if missing) **and** a verified primary email in `ALLOWED_EMAILS` (`403` otherwise) — this is enforced server-side in `server/middleware/auth.ts`, never trusting anything client-supplied. An empty or missing `ALLOWED_EMAILS` allows nobody (fails closed).
+- API handlers read the current user via `requireUserId(event)` (`server/auth/require-user-id.ts`), which throws `401` if it's somehow missing, and always pass that id into the repository layer.
+- The SPA client-side route guard (`app/middleware/auth.global.ts`) is defence in depth for UX (redirects to `/sign-in` or `/not-allowed`); it is not what makes data private.
+
 ## Contributing workflow
 
 - Every change starts from a GitHub issue; branch as `feat/<issue#>-short-name` (or `fix/`, `chore/`).

@@ -1,4 +1,6 @@
 <script setup lang="ts">
+const { isSignedIn } = useAuth()
+
 useHead({
   meta: [{ name: 'viewport', content: 'width=device-width, initial-scale=1' }],
   link: [{ rel: 'icon', href: '/favicon.ico' }],
@@ -18,6 +20,7 @@ useSeoMeta({
   <UApp>
     <UHeader title="Article Saver">
       <template #right>
+        <UserButton v-if="isSignedIn" />
         <UColorModeButton />
       </template>
     </UHeader>
