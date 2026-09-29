@@ -2,6 +2,8 @@
 // Dispatches `pnpm db:generate` / `pnpm db:migrate` to drizzle-kit with the
 // config for the dialect selected by DB_DIALECT (ADR 0006).
 import { spawnSync } from 'node:child_process'
+import { mkdirSync } from 'node:fs'
+import { sqliteDirToCreate } from '../server/db/sqlite-path.ts'
 
 const [command] = process.argv.slice(2)
 if (command !== 'generate' && command !== 'migrate') {
@@ -13,6 +15,12 @@ const dialect = process.env.DB_DIALECT ?? 'sqlite'
 if (dialect !== 'sqlite' && dialect !== 'postgres') {
   console.error(`Unknown DB_DIALECT "${dialect}"; expected "sqlite" or "postgres".`)
   process.exit(1)
+}
+
+// SQLite creates a missing file but not its parent directory.
+if (dialect === 'sqlite') {
+  const dir = sqliteDirToCreate(process.env.SQLITE_PATH ?? './.data/article-saver.sqlite')
+  if (dir) mkdirSync(dir, { recursive: true })
 }
 
 const configFile = `drizzle.${dialect}.config.ts`

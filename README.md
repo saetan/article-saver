@@ -137,7 +137,7 @@ Postgres is on `localhost:5432` (`article_saver` / `article_saver` / `article_sa
 Drizzle schemas, migrations and repositories live under `server/db/` and `server/repositories/`; app code only ever talks to the repository layer (`ItemRepository`, `TagRepository`, `JobRepository`), never to Drizzle directly. `DB_DIALECT` (`sqlite` | `postgres`) selects the driver `useDb()` builds — `@libsql/client` locally, `postgres.js` in production.
 
 - `pnpm db:generate` writes a new migration to `server/db/migrations/<dialect>/` from the schema in `server/db/schema/<dialect>.ts`. Schema changes are made in **both** dialect files and a migration generated for each.
-- **Migrations are a deploy step, not automatic on server start.** Run `pnpm db:migrate` (with `DB_DIALECT=postgres` and `DATABASE_URL` set) before starting the server on every deploy. For local SQLite dev, run it once after `pnpm install` (or whenever the schema changes) — `SQLITE_PATH` defaults to `./.data/article-saver.sqlite`.
+- **Migrations are a deploy step, not automatic on server start.** Run `pnpm db:migrate` (with `DB_DIALECT=postgres` and `DATABASE_URL` set) before starting the server on every deploy. For local SQLite dev, run it once after `pnpm install` (or whenever the schema changes) — `SQLITE_PATH` defaults to `./.data/article-saver.sqlite`, and its directory is created automatically (by `pnpm db:migrate` and by the app at startup), so no manual `mkdir` is needed on a fresh checkout.
 
 ### Authentication (ADR 0002, 0005)
 

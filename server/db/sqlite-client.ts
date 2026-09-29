@@ -1,6 +1,8 @@
 import { createClient } from '@libsql/client'
 import { drizzle, type LibSQLDatabase } from 'drizzle-orm/libsql'
+import { mkdirSync } from 'node:fs'
 import { sqliteSchema } from './schema/sqlite'
+import { sqliteDirToCreate } from './sqlite-path'
 
 export interface SqliteDbContext {
   dialect: 'sqlite'
@@ -15,6 +17,9 @@ export interface SqliteDbContext {
  * `@libsql/client`'s platform-specific native binary.
  */
 export function createSqliteDbContext(url: string): SqliteDbContext {
+  // SQLite creates a missing file but not its parent directory.
+  const dir = sqliteDirToCreate(url)
+  if (dir) mkdirSync(dir, { recursive: true })
   const client = createClient({ url })
   return { dialect: 'sqlite', db: drizzle(client, { schema: sqliteSchema }), schema: sqliteSchema }
 }
