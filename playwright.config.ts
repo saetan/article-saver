@@ -15,9 +15,17 @@ export default defineConfig({
   workers: 1,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 1 : 0,
-  reporter: process.env.CI ? [['github'], ['html', { open: 'never' }]] : 'list',
+  // The JSON file only feeds scripts/e2e-summary.mjs (CI job summary).
+  reporter: process.env.CI
+    ? [
+        ['github'],
+        ['html', { open: 'never' }],
+        ['json', { outputFile: 'test-results/e2e-results.json' }]
+      ]
+    : 'list',
   use: {
     baseURL: APP_URL,
+    screenshot: process.env.CI ? 'on' : 'only-on-failure',
     trace: 'retain-on-failure'
   },
   projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }],
