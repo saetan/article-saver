@@ -2,6 +2,7 @@ import { clerkClient } from '@clerk/nuxt/server'
 import { createError, defineEventHandler } from 'h3'
 import { parseAllowlist } from '../auth/allowlist'
 import { authorizeRequest } from '../auth/authorize'
+import { isClerkProxyPath } from '../auth/clerk-proxy'
 import { normalizeApiPath } from '../auth/normalize-path'
 import { resolvePrimaryVerifiedEmail } from '../auth/user-email'
 import { useUserEmailCache } from '../auth/user-email-cache'
@@ -10,7 +11,8 @@ const PUBLIC_API_PATHS = new Set(['/api/health'])
 
 /**
  * Authorises every `/api/**` request (ADR 0002, 0005), except the public
- * `/api/health` check. Must run after `server/middleware/00.clerk.ts`,
+ * `/api/health` check and the Clerk Frontend API proxy (`/api/__clerk` and
+ * its descendants, which must work before anyone is signed in). Must run after `server/middleware/00.clerk.ts`,
  * which populates `event.context.auth` — the `00.`/`01.` filename prefixes
  * are load-bearing: Nitro loads `server/middleware/*` alphabetically, and
  * `clerk.skipServerMiddleware: true` in `nuxt.config.ts` stops the module
@@ -43,7 +45,7 @@ export default defineEventHandler(async (event) => {
 
   const path = normalized.path
 
-  if (!path.startsWith('/api/') || PUBLIC_API_PATHS.has(path)) {
+  if (!path.startsWith('/api/') || PUBLIC_API_PATHS.has(path) || isClerkProxyPath(event.path)) {
     return
   }
 

@@ -47,6 +47,31 @@ describe('auth middleware', () => {
     expect(getUserMock).not.toHaveBeenCalled()
   })
 
+  it.each(['/api/__clerk', '/api/__clerk/v1/environment', '/api/__clerk/v1/client?x=1'])(
+    'lets the Clerk proxy path %s through unauthenticated',
+    async (path) => {
+      await expect(authMiddleware(fakeEvent(path, null))).resolves.toBeUndefined()
+      expect(getUserMock).not.toHaveBeenCalled()
+    }
+  )
+
+  it.each([
+    '/api/__clerk/../items',
+    '/api/__clerk/%2e%2e/items',
+    '/api/__clerkx/v1',
+    '/api/items/__clerk',
+    '/api/__clerk%2F..%2Fitems',
+    '/%61pi/__clerk/..%2fme'
+  ])('still protects %s', async (path) => {
+    await expect(authMiddleware(fakeEvent(path, null))).rejects.toMatchObject({ statusCode: 401 })
+  })
+
+  it('400s a malformed path instead of skipping auth', async () => {
+    await expect(authMiddleware(fakeEvent('/api/__clerk/%E0%A4%A', null))).rejects.toMatchObject({
+      statusCode: 400
+    })
+  })
+
   it('skips non-API paths', async () => {
     const event = fakeEvent('/library', null)
     await expect(authMiddleware(event)).resolves.toBeUndefined()

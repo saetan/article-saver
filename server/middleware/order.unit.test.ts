@@ -50,4 +50,10 @@ describe('server middleware registration order (security review round 2, #5)', (
     const source = readFileSync(join(MIDDLEWARE_DIR, '00.clerk.ts'), 'utf-8')
     expect(source).toMatch(/clerkMiddleware\s*\(/)
   })
+
+  it('00.clerk.ts and 02.csrf.ts exempt only the Clerk proxy path (via isClerkProxyPath)', () => {
+    for (const file of ['00.clerk.ts', '01.auth.ts', '02.csrf.ts']) {
+      expect(readFileSync(join(MIDDLEWARE_DIR, file), 'utf-8')).toMatch(/isClerkProxyPath\s*\(/)
+    }
+  })
 })
