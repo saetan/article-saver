@@ -1,4 +1,7 @@
 import { clerkMiddleware } from '@clerk/nuxt/server'
+import { defineEventHandler } from 'h3'
+
+const clerk = clerkMiddleware()
 
 /**
  * Registers Clerk's own middleware explicitly (nuxt.config.ts sets
@@ -11,5 +14,14 @@ import { clerkMiddleware } from '@clerk/nuxt/server'
  * every request as unauthenticated (security review round 2, #5: the
  * module's auto-registered middleware ran AFTER ours, so this was a real
  * production bug, not just a test gap).
+ *
+ * `/__clerk/**` is skipped: those requests are the Clerk Frontend API
+ * proxy (`server/routes/__clerk/[...path].ts`), which just forwards them
+ * to Clerk, and authenticating them here could trigger handshake
+ * redirects on what must be a transparent pass-through.
  */
-export default clerkMiddleware()
+export default defineEventHandler((event) => {
+  const path = event.path.split('?')[0] ?? ''
+  if (path === '/__clerk' || path.startsWith('/__clerk/')) return
+  return clerk(event as Parameters<typeof clerk>[0])
+})
