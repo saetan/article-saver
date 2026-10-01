@@ -13,6 +13,21 @@ test('signed out: / redirects to /sign-in', async ({ page }) => {
   await expect(page).toHaveURL(/\/sign-in/)
 })
 
+test('signed out: /sign-up is reachable without redirecting to /sign-in', async ({ page }) => {
+  await setupClerkTestingToken({ page })
+  await page.goto('/sign-up')
+  await expect(page).toHaveURL(/\/sign-up/)
+  await expect(page.locator('.cl-signUp-root')).toBeVisible()
+})
+
+for (const flow of ['sign-in', 'sign-up']) {
+  test(`signed out: /${flow}/sso-callback is not redirected to bare /sign-in`, async ({ page }) => {
+    await setupClerkTestingToken({ page })
+    await page.goto(`/${flow}/sso-callback`)
+    await expect(page).toHaveURL(new RegExp(`/${flow}/sso-callback`))
+  })
+}
+
 test('signed in (allowlisted): Library loads and /api/me returns 200', async ({ page }) => {
   await setupClerkTestingToken({ page })
   await page.goto('/sign-in')
