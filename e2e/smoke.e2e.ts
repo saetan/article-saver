@@ -13,6 +13,12 @@ test('signed out: / redirects to /sign-in', async ({ page }) => {
   await expect(page).toHaveURL(/\/sign-in/)
 })
 
+test('signed out: /sign-up is reachable without redirecting to /sign-in', async ({ page }) => {
+  await setupClerkTestingToken({ page })
+  await page.goto('/sign-up')
+  await expect(page).toHaveURL(/\/sign-up/)
+})
+
 test('signed in (allowlisted): Library loads and /api/me returns 200', async ({ page }) => {
   await setupClerkTestingToken({ page })
   await page.goto('/sign-in')

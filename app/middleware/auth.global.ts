@@ -18,7 +18,7 @@ interface AccessState {
  */
 export default defineNuxtRouteMiddleware(async (to) => {
   if (import.meta.server) return
-  if (to.path === '/sign-in') return
+  if (to.path === '/sign-in' || to.path === '/sign-up') return
 
   const { isLoaded, isSignedIn, userId } = useAuth()
 
