@@ -1,4 +1,4 @@
-modules = ["web", "bash", "nodejs-24", "postgresql-16"]
+modules = ["web", "bash", "nodejs-24", "postgresql-16", "python-base-3.13"]
 
 [nix]
 channel = "stable-25_05"
@@ -42,4 +42,4 @@ externalPort = 80
 [deployment]
 deploymentTarget = "autoscale"
 run = ["node", ".output/server/index.mjs"]
-build = ["bash", "-c", "CI=1 npm exec --yes --package=pnpm@12.4.1 -- pnpm build"]
+build = ["bash", "-c", "export CI=1; npm exec --yes --package=pnpm@12.4.1 -- pnpm install --frozen-lockfile && npm exec --yes --package=pnpm@12.4.1 -- pnpm build"]
