@@ -1,0 +1,1 @@
+- [Replit import toolchain](replit-import-toolchain.md) — align Node and pnpm pins; stale imported modules and older pnpm can block setup.

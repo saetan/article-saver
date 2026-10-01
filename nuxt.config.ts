@@ -11,6 +11,14 @@ export default defineNuxtConfig({
 
   css: ['~/assets/css/main.css'],
 
+  // Replit provisions these values as CLERK_* secrets. Keep the secret key
+  // in private Nitro runtime config; only the publishable key reaches clients.
+  runtimeConfig: {
+    clerk: {
+      secretKey: process.env.CLERK_SECRET_KEY
+    }
+  },
+
   compatibilityDate: '2026-06-30',
 
   // ADR 0005: Clerk for browser sessions, restricted/allowlist sign-up.
@@ -26,6 +34,7 @@ export default defineNuxtConfig({
   // 01.auth.ts. See server/middleware/order.unit.test.ts for the
   // regression test.
   clerk: {
+    publishableKey: process.env.CLERK_PUBLISHABLE_KEY,
     signInUrl: '/sign-in',
     skipServerMiddleware: true
   },
@@ -37,5 +46,5 @@ export default defineNuxtConfig({
         braceStyle: '1tbs'
       }
     }
-  }
+  },
 })
