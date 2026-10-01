@@ -17,7 +17,7 @@ A personal read-it-later app for web articles, PDFs, and posts from X, Threads a
 | Concern | Choice |
 |---|---|
 | Framework | Nuxt 4 (SPA mode) + Nitro API, Nuxt UI |
-| Database | Drizzle ORM — SQLite locally, PostgreSQL in production (`DB_DIALECT`) |
+| Database | Drizzle ORM — PostgreSQL in Replit development and production; SQLite for tests (`DB_DIALECT`) |
 | Files | `BlobStorage` interface — local disk / Replit Object Storage |
 | Auth | Clerk (allowlisted sign-in) + personal API tokens |
 | Tests | Vitest, Testcontainers (Postgres), Playwright e2e |
@@ -27,7 +27,13 @@ The reasoning behind each choice lives in [`docs/decisions/`](docs/decisions/). 
 
 ## Development
 
-Requires Node 24+ (see `.nvmrc`) and pnpm.
+Requires Node 24+ (see `.nvmrc`) and pnpm 12.4.1.
+
+On Replit, `DB_DIALECT=postgres` is configured for both development and
+production. Replit provides a separate managed `DATABASE_URL` in each
+environment; do not copy a database URL between them. Run `pnpm db:migrate`
+against development after installing dependencies. Replit applies the schema
+to its managed production database when you publish.
 
 ```sh
 cp .env.example .env  # fill in values; never commit .env
@@ -56,7 +62,7 @@ pnpm db:migrate     # apply pending migrations for DB_DIALECT
 
 The app is a Nuxt 4 SPA (`ssr: false`, `app/` directory layout) with a Nitro API under `server/`. `GET /api/health` returns `{ ok: true }`.
 
-Postgres for local development and integration tests runs in a container (Docker or Podman — see [ADR 0012](docs/decisions/0012-testing-and-ci-strategy.md)).
+For local development outside Replit, Postgres can run in a container (Docker or Podman — see [ADR 0012](docs/decisions/0012-testing-and-ci-strategy.md)).
 
 ### Saving URLs, the job queue and CSRF
 
@@ -137,11 +143,11 @@ Postgres is on `localhost:5432` (`article_saver` / `article_saver` / `article_sa
 Drizzle schemas, migrations and repositories live under `server/db/` and `server/repositories/`; app code only ever talks to the repository layer (`ItemRepository`, `TagRepository`, `JobRepository`), never to Drizzle directly. `DB_DIALECT` (`sqlite` | `postgres`) selects the driver `useDb()` builds — `@libsql/client` locally, `postgres.js` in production.
 
 - `pnpm db:generate` writes a new migration to `server/db/migrations/<dialect>/` from the schema in `server/db/schema/<dialect>.ts`. Schema changes are made in **both** dialect files and a migration generated for each.
-- **Migrations are a deploy step, not automatic on server start.** Run `pnpm db:migrate` (with `DB_DIALECT=postgres` and `DATABASE_URL` set) before starting the server on every deploy. For local SQLite dev, run it once after `pnpm install` (or whenever the schema changes) — `SQLITE_PATH` defaults to `./.data/article-saver.sqlite`, and its directory is created automatically (by `pnpm db:migrate` and by the app at startup), so no manual `mkdir` is needed on a fresh checkout.
+- **Migrations are not automatic on server start.** For Replit's managed database, apply migrations to development with `pnpm db:migrate`; publishing carries the development schema to production. Do not run the migration command against Replit production. For local SQLite dev, run it once after `pnpm install` (or whenever the schema changes) — `SQLITE_PATH` defaults to `./.data/article-saver.sqlite`, and its directory is created automatically (by `pnpm db:migrate` and by the app at startup).
 
 ### Authentication (ADR 0002, 0005)
 
-Sign-in is via [Clerk](https://clerk.com) (`@clerk/nuxt`), restricted to the emails listed in `ALLOWED_EMAILS` (comma-separated, case-insensitive). Set `NUXT_PUBLIC_CLERK_PUBLISHABLE_KEY`, `NUXT_CLERK_SECRET_KEY` and `ALLOWED_EMAILS` in `.env` (get the Clerk keys from your [Clerk dashboard](https://dashboard.clerk.com)).
+Sign-in is via Clerk (`@clerk/nuxt`), restricted to the emails listed in `ALLOWED_EMAILS` (comma-separated, case-insensitive). On Replit, Clerk keys are provisioned as workspace secrets and wired into the Nuxt runtime config. Set `ALLOWED_EMAILS` to the account email(s) allowed to sign in. Outside Replit, set `NUXT_PUBLIC_CLERK_PUBLISHABLE_KEY`, `NUXT_CLERK_SECRET_KEY` and `ALLOWED_EMAILS` in `.env`.
 
 - Every `/api/**` route except `GET /api/health` requires a Clerk session (`401` if missing) **and** a verified primary email in `ALLOWED_EMAILS` (`403` otherwise) — this is enforced server-side by `server/middleware/00.clerk.ts` (installs Clerk's session middleware) followed by `server/middleware/01.auth.ts` (the allowlist check); the numeric prefixes fix their order, see `order.unit.test.ts`. Nothing client-supplied is ever trusted. Never trusting anything client-supplied. An empty or missing `ALLOWED_EMAILS` allows nobody (fails closed).
 - API handlers read the current user via `requireUserId(event)` (`server/auth/require-user-id.ts`), which throws `401` if it's somehow missing, and always pass that id into the repository layer.
