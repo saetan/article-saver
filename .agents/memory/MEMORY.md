@@ -1,2 +1,3 @@
 - [Replit import toolchain](replit-import-toolchain.md) — align Node and pnpm pins; stale imported modules and older pnpm can block setup.
 - [Nuxt auth runtime constraints](nuxt-auth-runtime.md) — shared runtime config is frozen; mock-only tests can miss startup failures and persisted deployment overrides.
+- [GitHub source transfer](github-source-transfer.md) — connector authorization is separate from Git CLI credentials; verify tree hashes when transferring changes through the API.
