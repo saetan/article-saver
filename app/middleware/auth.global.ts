@@ -9,16 +9,18 @@ interface AccessState {
 /**
  * Client-side route guard (ADR 0011: SPA mode, no server-rendered pages to
  * gate). This is defence in depth for UX only — the real enforcement is the
- * `/api/**` server middleware (`server/middleware/auth.ts`); a user can't
- * get real data just by bypassing this.
+ * `/api/**` server middleware (`server/middleware/00.clerk.ts` +
+ * `01.auth.ts`); a user can't get real data just by bypassing this.
  *
- * - Not signed in and not already headed to `/sign-in` -> redirect there.
+ * - Not signed in and not already headed to `/sign-in`, `/sign-up` or a
+ *   sub-path of either (Clerk's path routing, e.g. `/sign-in/sso-callback`)
+ *   -> redirect to `/sign-in`.
  * - Signed in but not allowlisted (learned from `/api/me` returning 403)
  *   -> redirect to `/not-allowed`.
  */
 export default defineNuxtRouteMiddleware(async (to) => {
   if (import.meta.server) return
-  if (to.path === '/sign-in' || to.path === '/sign-up') return
+  if (isAuthPagePath(to.path)) return
 
   const { isLoaded, isSignedIn, userId } = useAuth()
 
