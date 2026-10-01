@@ -1,21 +1,32 @@
 import { defineNitroPlugin, useRuntimeConfig } from '#imports'
-import { CLERK_PROXY_PATH, isProductionPublishableKey } from '../auth/clerk-proxy'
+import type { H3Event } from 'h3'
+
+type RequestHookApp = {
+  hooks: {
+    hook(name: 'request', handler: (event: H3Event) => void): void
+  }
+}
 
 /**
- * Points the Clerk client at the app's own `/api/__clerk` proxy when (and
- * only when) the runtime publishable key is the production one. Decided at
- * startup from the managed key, so no proxy URL is configured by hand and
- * development/preview keep talking to their Clerk dev instance directly.
- * An explicit `NUXT_PUBLIC_CLERK_PROXY_URL` is left untouched.
+ * Forwards Replit's runtime-managed proxy URL to the Clerk client. It is
+ * auto-populated in production and empty in development. Custom Nuxt proxy
+ * overrides must not take precedence over this managed configuration.
  */
-export default defineNitroPlugin(() => {
-  const config = useRuntimeConfig()
-  const clerk = ((config.public as Record<string, unknown>).clerk ??= {}) as {
-    publishableKey?: string
-    proxyUrl?: string
-  }
-  clerk.publishableKey ||= process.env.CLERK_PUBLISHABLE_KEY
-  if (!clerk.proxyUrl && isProductionPublishableKey(clerk.publishableKey)) {
-    clerk.proxyUrl = CLERK_PROXY_PATH
-  }
+export default defineNitroPlugin((nitroApp: RequestHookApp) => {
+  // Nitro freezes global runtime config. Its event-scoped copy is mutable
+  // and is also the configuration serialized for the browser.
+  nitroApp.hooks.hook('request', (event) => {
+    const config = useRuntimeConfig(event)
+    const clerk = ((config.public as Record<string, unknown>).clerk ??= {}) as {
+      publishableKey?: string
+      proxyUrl?: string
+    }
+    clerk.publishableKey ||= process.env.CLERK_PUBLISHABLE_KEY
+    const proxyUrl = process.env.CLERK_PROXY_URL
+    if (proxyUrl) {
+      clerk.proxyUrl = proxyUrl
+    } else {
+      delete clerk.proxyUrl
+    }
+  })
 })
