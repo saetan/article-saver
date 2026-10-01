@@ -13,6 +13,8 @@ export default defineNuxtConfig({
 
   // Replit provisions these values as CLERK_* secrets. Keep the secret key
   // in private Nitro runtime config; only the publishable key reaches clients.
+  // The production proxy URL is not configured here: server/plugins/clerk-proxy.ts
+  // sets it at runtime from the managed (pk_live_) key.
   runtimeConfig: {
     clerk: {
       secretKey: process.env.CLERK_SECRET_KEY

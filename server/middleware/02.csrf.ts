@@ -5,6 +5,7 @@ import {
   requiresCsrfCheck,
   resolveExpectedOrigin
 } from '../auth/csrf'
+import { isClerkProxyPath } from '../auth/clerk-proxy'
 import { normalizeApiPath } from '../auth/normalize-path'
 
 /**
@@ -27,6 +28,8 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 400, statusMessage: 'Bad Request' })
   }
   if (!normalized.path.startsWith('/api/')) return
+  // Clerk Frontend API proxy: carries Clerk's own credentials, not our session.
+  if (isClerkProxyPath(event.path)) return
   if (!requiresCsrfCheck(event.method)) return
 
   // M2: API-token requests skip the same-origin check (not ambient credentials).
