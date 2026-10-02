@@ -19,8 +19,8 @@ test('save a URL, see it listed with a status badge, and get "Already saved" on 
 
   const row = page.getByRole('listitem').filter({ hasText: url })
   await expect(row).toBeVisible()
-  // No extractor exists yet (#13/#16/#17), so the job ends as Failed; while
-  // queued it shows Extracting. Either way a status badge is rendered.
+  // Depending on timing (and whether example.com is reachable) the job is
+  // Extracting, Saved or Failed. Either way a status badge is rendered.
   await expect(row.getByText(/Extracting|Failed|Saved/)).toBeVisible()
 
   await input.fill(url)
