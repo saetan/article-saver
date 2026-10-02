@@ -15,11 +15,6 @@ Production secrets / environment:
 - `ALLOWED_EMAILS`: comma-separated emails allowed to sign in.
 - `NUXT_PUBLIC_APP_ORIGIN=https://<your-app>.replit.app`: used by the CSRF check and to pin the Clerk proxy host.
 
-After publishing, verify (owner step, pending until done):
-
-1. `curl -i https://<your-app>.replit.app/api/__clerk/v1/environment` returns `200` with Clerk environment JSON (not `host_invalid`, not an app `401`).
-2. Sign in with a permitted account; confirm a non-permitted account is denied.
-
 ## Database
 
 Production uses a separate Replit-managed PostgreSQL database. `DB_DIALECT=postgres` is a shared env var in `.replit`, and `DATABASE_URL` is runtime-managed by Replit. The build and run commands contain no migration step. The workflow is: run `pnpm db:migrate` against the development database, then publish. Replit's publishing flow applies the schema changes to the production database. Before publishing, check that a new migration was applied to dev.
@@ -59,8 +54,6 @@ Enable Google sign-up. Where supported, set Restrictions → Allowlist to mirror
 After publishing, verify (owner step, pending until done):
 
 1. `curl -i https://<your-app>.replit.app/api/__clerk/v1/environment` returns `200` with Clerk environment JSON (not `host_invalid`, not an app `401`).
-2. Sign in with a permitted account; confirm a non-permitted account is denied.
+2. A returning allowlisted account can sign in.
 3. A first-time allowlisted Google sign-up works.
-4. A non-allowlisted account lands on /not-allowed.
-
-Deployment type: Autoscale with **Max machines = 1**.
+4. A non-allowlisted account lands on `/not-allowed`.
