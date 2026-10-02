@@ -45,6 +45,17 @@ describe('Clerk proxy runtime configuration', () => {
     expect(config.value.public.clerk.proxyUrl).toBe('https://app.example.com/api/__clerk')
   })
 
+  it('falls back to the proxy path for pk_live_ when CLERK_PROXY_URL is empty', () => {
+    config.value.public.clerk = {
+      publishableKey: 'pk_live_test',
+      proxyUrl: 'https://app.example.com/__clerk'
+    }
+
+    runRequestHook()
+
+    expect(config.value.public.clerk.proxyUrl).toBe('/api/__clerk')
+  })
+
   it('removes explicit proxy configuration for development keys', () => {
     config.value.public.clerk = {
       publishableKey: 'pk_test_dev',
