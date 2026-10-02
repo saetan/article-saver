@@ -11,6 +11,8 @@ expertMode = true
 [userenv.shared]
 DB_DIALECT = "postgres"
 
+[userenv.production]
+
 [workflows]
 runButton = "Project"
 
