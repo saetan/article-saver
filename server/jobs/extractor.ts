@@ -41,9 +41,10 @@ export const EXTRACTION_NOT_AVAILABLE_MESSAGE = 'Extraction not available yet'
 export type ExtractorRegistry = Partial<Record<ItemType, Extractor>>
 
 /**
- * The registry the app runs with. Empty until #13/#16/#17 register their
- * extractors here; until then every type fails fast with
- * {@link EXTRACTION_NOT_AVAILABLE_MESSAGE}, without retries.
+ * Empty registry: every type fails fast with
+ * {@link EXTRACTION_NOT_AVAILABLE_MESSAGE}, without retries. The app's real
+ * registry is assembled in `server/plugins/jobs-worker.ts` (the article
+ * extractor lives in `server/extraction`, which imports this module).
  */
 export const defaultExtractors: ExtractorRegistry = {}
 
