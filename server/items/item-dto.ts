@@ -16,7 +16,10 @@ export type ItemSummary = Pick<
   | 'extractionStatus'
   | 'extractionError'
   | 'createdAt'
->
+> & {
+  /** True when the user pasted text for this item (the text itself stays out of the list). */
+  hasPastedText: boolean
+}
 
 export function toItemSummary(item: Item): ItemSummary {
   return {
@@ -32,7 +35,8 @@ export function toItemSummary(item: Item): ItemSummary {
     isFavorite: item.isFavorite,
     extractionStatus: item.extractionStatus,
     extractionError: item.extractionError,
-    createdAt: item.createdAt
+    createdAt: item.createdAt,
+    hasPastedText: !!item.pastedText
   }
 }
 

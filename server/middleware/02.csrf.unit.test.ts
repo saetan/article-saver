@@ -22,6 +22,16 @@ describe('csrf middleware', () => {
     delete process.env.NUXT_PUBLIC_APP_ORIGIN
   })
 
+  it.each([
+    ['POST', '/api/items/abc/retry'],
+    ['PATCH', '/api/items/abc']
+  ])('rejects cross-site %s %s and allows same-origin', async (method, path) => {
+    const cross = fakeEvent({ method, path, headers: { 'sec-fetch-site': 'cross-site' } })
+    await expect(csrfMiddleware(cross)).rejects.toMatchObject({ statusCode: 403 })
+    const same = fakeEvent({ method, path, headers: { 'sec-fetch-site': 'same-origin' } })
+    await expect(csrfMiddleware(same)).resolves.toBeUndefined()
+  })
+
   it('with NUXT_PUBLIC_APP_ORIGIN set, compares Origin to it and ignores forwarded headers', async () => {
     process.env.NUXT_PUBLIC_APP_ORIGIN = 'https://app.example.com'
     const spoofed = fakeEvent({

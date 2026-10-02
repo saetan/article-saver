@@ -14,6 +14,8 @@ vi.mock('../utils/db', () => ({ useDb: async () => ctx }))
 const { default: postItem } = await import('./items.post')
 const { default: listItems } = await import('./items.get')
 const { default: getItem } = await import('./items/[id].get')
+const { default: patchItem } = await import('./items/[id].patch')
+const { default: retryItem } = await import('./items/[id].retry.post')
 
 const app = createApp()
 // Stand-in for 00.clerk/01.auth: the test user comes from a header.
@@ -27,6 +29,8 @@ const router = createRouter()
 router.post('/api/items', postItem)
 router.get('/api/items', listItems)
 router.get('/api/items/:id', getItem)
+router.patch('/api/items/:id', patchItem)
+router.post('/api/items/:id/retry', retryItem)
 app.use(router)
 const handle = toWebHandler(app)
 
@@ -174,5 +178,110 @@ describe('items API', () => {
 
     expect((await call('user-2', 'GET', `/api/items/${created.id}`)).status).toBe(404)
     expect((await call('user-1', 'GET', '/api/items/nope')).status).toBe(404)
+  })
+
+  describe('POST /api/items/:id/retry', () => {
+    async function failedItem(user = 'user-1') {
+      return (await createItemRepository(ctx)).create(user, {
+        type: 'article',
+        url: 'https://example.com/f',
+        canonicalUrl: 'https://example.com/f',
+        extractionStatus: 'failed',
+        extractionError: 'boom'
+      })
+    }
+
+    it('resets a failed item to pending and enqueues an extract job', async () => {
+      const item = await failedItem()
+      const res = await call('user-1', 'POST', `/api/items/${item.id}/retry`)
+      expect(res.status).toBe(200)
+      expect(await res.json()).toMatchObject({ extractionStatus: 'pending', extractionError: null })
+      const jobs = await (await createJobRepository(ctx)).listPending('user-1')
+      expect(jobs).toHaveLength(1)
+      expect(jobs[0]).toMatchObject({ itemId: item.id, type: 'extract', status: 'pending' })
+    })
+
+    it("404s another user's item and unknown ids, changing nothing", async () => {
+      const item = await failedItem()
+      expect((await call('user-2', 'POST', `/api/items/${item.id}/retry`)).status).toBe(404)
+      expect((await call('user-1', 'POST', '/api/items/nope/retry')).status).toBe(404)
+      const after = await (await createItemRepository(ctx)).findById('user-1', item.id)
+      expect(after?.extractionStatus).toBe('failed')
+      expect(await (await createJobRepository(ctx)).listPending('user-1')).toHaveLength(0)
+    })
+
+    it('409s a non-failed item and enqueues nothing more', async () => {
+      const created = await (
+        await call('user-1', 'POST', '/api/items', { url: 'https://example.com/a' })
+      ).json()
+      const res = await call('user-1', 'POST', `/api/items/${created.id}/retry`)
+      expect(res.status).toBe(409)
+      expect(await (await createJobRepository(ctx)).listPending('user-1')).toHaveLength(1)
+    })
+
+    it('is 401 without a session', async () => {
+      expect((await call(null, 'POST', '/api/items/x/retry')).status).toBe(401)
+    })
+  })
+
+  describe('PATCH /api/items/:id', () => {
+    async function anyItem(user = 'user-1') {
+      return (await createItemRepository(ctx)).create(user, {
+        type: 'article',
+        url: 'https://example.com/p',
+        canonicalUrl: 'https://example.com/p',
+        extractionStatus: 'failed'
+      })
+    }
+
+    it('stores pasted text (either key) and returns the item', async () => {
+      const item = await anyItem()
+      const res = await call('user-1', 'PATCH', `/api/items/${item.id}`, {
+        pastedText: '<b>hi</b>'
+      })
+      expect(res.status).toBe(200)
+      expect((await res.json()).pastedText).toBe('<b>hi</b>')
+
+      const snake = await call('user-1', 'PATCH', `/api/items/${item.id}`, { pasted_text: 'two' })
+      expect(snake.status).toBe(200)
+      const stored = await (await createItemRepository(ctx)).findById('user-1', item.id)
+      expect(stored?.pastedText).toBe('two')
+    })
+
+    it("404s another user's item and leaves it untouched", async () => {
+      const item = await anyItem()
+      expect(
+        (await call('user-2', 'PATCH', `/api/items/${item.id}`, { pastedText: 'x' })).status
+      ).toBe(404)
+      expect(
+        (await (await createItemRepository(ctx)).findById('user-1', item.id))?.pastedText
+      ).toBeNull()
+    })
+
+    it.each([
+      ['empty body', {}],
+      ['non-string', { pastedText: 5 }],
+      ['too long', { pastedText: 'a'.repeat(200_001) }],
+      ['unknown field alongside', { pastedText: 'x', status: 'archived' }]
+    ])('400s %s', async (_l, body) => {
+      const item = await anyItem()
+      expect((await call('user-1', 'PATCH', `/api/items/${item.id}`, body)).status).toBe(400)
+    })
+
+    it('rejects an attempt to set userId and changes nothing', async () => {
+      const item = await anyItem()
+      const res = await call('user-1', 'PATCH', `/api/items/${item.id}`, {
+        pastedText: 'x',
+        userId: 'attacker'
+      })
+      expect(res.status).toBe(400)
+      const stored = await (await createItemRepository(ctx)).findById('user-1', item.id)
+      expect(stored).toMatchObject({ userId: 'user-1', pastedText: null })
+      expect(await (await createItemRepository(ctx)).list('attacker')).toHaveLength(0)
+    })
+
+    it('is 401 without a session', async () => {
+      expect((await call(null, 'PATCH', '/api/items/x', { pastedText: 'x' })).status).toBe(401)
+    })
   })
 })

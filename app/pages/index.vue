@@ -65,6 +65,51 @@ function displayTitle(item: LibraryItem) {
   return item.title || item.url
 }
 
+const actionError = ref<string | null>(null)
+const retryingId = ref<string | null>(null)
+const pasteOpenId = ref<string | null>(null)
+const pasteText = ref('')
+const pasteSaving = ref(false)
+
+async function retry(item: LibraryItem) {
+  actionError.value = null
+  retryingId.value = item.id
+  try {
+    await $fetch(`/api/items/${item.id}/retry`, { method: 'POST' })
+    await refresh()
+  } catch {
+    actionError.value = 'Could not retry that item. Please try again.'
+  } finally {
+    retryingId.value = null
+  }
+}
+
+function openPaste(item: LibraryItem) {
+  pasteOpenId.value = item.id
+  pasteText.value = ''
+  actionError.value = null
+}
+
+async function savePaste(item: LibraryItem) {
+  const text = pasteText.value
+  if (!text.trim()) {
+    actionError.value = 'Paste some text to save.'
+    return
+  }
+  actionError.value = null
+  pasteSaving.value = true
+  try {
+    await $fetch(`/api/items/${item.id}`, { method: 'PATCH', body: { pastedText: text } })
+    pasteOpenId.value = null
+    pasteText.value = ''
+    await refresh()
+  } catch {
+    actionError.value = 'Could not save that text. Please try again.'
+  } finally {
+    pasteSaving.value = false
+  }
+}
+
 async function save() {
   validationError.value = null
   errorMessage.value = null
@@ -155,6 +200,15 @@ async function save() {
       </div>
     </UPageCard>
 
+    <UAlert
+      v-if="actionError"
+      class="mt-6"
+      color="error"
+      variant="subtle"
+      icon="i-lucide-circle-alert"
+      :title="actionError"
+    />
+
     <ul v-else class="mt-6 divide-y divide-default rounded-lg border border-default">
       <li v-for="item in items" :key="item.id" class="flex items-start gap-3 p-4">
         <div class="min-w-0 flex-1">
@@ -170,6 +224,48 @@ async function save() {
           >
             {{ item.extractionError }}
           </p>
+          <template v-if="item.extractionStatus === 'failed'">
+            <p v-if="item.hasPastedText" class="text-sm text-muted">Pasted text saved.</p>
+            <div class="mt-2 flex gap-2">
+              <UButton
+                size="xs"
+                variant="outline"
+                icon="i-lucide-rotate-cw"
+                data-testid="retry-item"
+                :loading="retryingId === item.id"
+                @click="retry(item)"
+              >
+                Retry
+              </UButton>
+              <UButton
+                size="xs"
+                variant="outline"
+                icon="i-lucide-clipboard-paste"
+                data-testid="paste-item"
+                @click="openPaste(item)"
+              >
+                Paste content
+              </UButton>
+            </div>
+            <form
+              v-if="pasteOpenId === item.id"
+              class="mt-2 flex flex-col gap-2"
+              @submit.prevent="savePaste(item)"
+            >
+              <UTextarea
+                v-model="pasteText"
+                :rows="6"
+                maxlength="200000"
+                placeholder="Paste the article text here"
+                class="w-full"
+                aria-label="Pasted content"
+              />
+              <div class="flex gap-2">
+                <UButton type="submit" size="xs" :loading="pasteSaving">Save text</UButton>
+                <UButton size="xs" variant="ghost" @click="pasteOpenId = null">Cancel</UButton>
+              </div>
+            </form>
+          </template>
         </div>
         <UBadge
           :color="statusMeta[item.extractionStatus].color"
