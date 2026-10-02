@@ -1,4 +1,4 @@
-modules = ["web", "bash", "nodejs-24", "postgresql-16", "python-base-3.13"]
+modules = ["web", "bash", "nodejs-24", "python-base-3.13", "postgresql-16"]
 
 [nix]
 channel = "stable-25_05"
@@ -12,6 +12,8 @@ expertMode = true
 DB_DIALECT = "postgres"
 
 [userenv.production]
+BLOB_STORAGE = "replit"
+NUXT_PUBLIC_APP_ORIGIN = "https://article-saver-YongSongSae.replit.app"
 
 [workflows]
 runButton = "Project"
