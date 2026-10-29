@@ -173,10 +173,17 @@ async function save() {
           :title="`Already saved on ${formatDate(duplicate.savedAt)}`"
         >
           <template #description>
-            <!-- The reader page doesn't exist yet: link to the original URL. -->
-            <ULink :href="duplicateUrl ?? undefined" target="_blank" rel="noopener noreferrer">
-              Open it
-            </ULink>
+            <div class="flex flex-wrap gap-x-4 gap-y-1">
+              <NuxtLink
+                :to="`/items/${duplicate.existingItemId}`"
+                class="font-medium text-primary hover:underline"
+              >
+                Read saved copy
+              </NuxtLink>
+              <ULink :href="duplicateUrl ?? undefined" target="_blank" rel="noopener noreferrer">
+                Open original
+              </ULink>
+            </div>
           </template>
         </UAlert>
 
@@ -212,12 +219,21 @@ async function save() {
     <ul v-else class="mt-6 divide-y divide-default rounded-lg border border-default">
       <li v-for="item in items" :key="item.id" class="flex items-start gap-3 p-4">
         <div class="min-w-0 flex-1">
-          <ULink :href="item.url" target="_blank" rel="noopener noreferrer" class="font-medium">
+          <NuxtLink :to="`/items/${item.id}`" class="font-medium hover:underline">
             <span class="block truncate">{{ displayTitle(item) }}</span>
-          </ULink>
+          </NuxtLink>
           <p class="truncate text-sm text-muted">
             {{ item.type.replace('_', ' ') }} · {{ formatDate(item.createdAt) }}
           </p>
+          <ULink
+            :href="item.url"
+            target="_blank"
+            rel="noopener noreferrer"
+            class="mt-1 inline-flex items-center gap-1 text-xs text-muted hover:text-primary"
+          >
+            Open original
+            <UIcon name="i-lucide-arrow-up-right" class="size-3" />
+          </ULink>
           <p
             v-if="item.extractionStatus === 'failed' && item.extractionError"
             class="text-sm text-error"
